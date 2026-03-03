@@ -325,7 +325,6 @@ async function main(): Promise<void> {
     scheduleRender();
   });
 
-  state.messages.push({ role: "system", text: "Connected to exocortexd. Type a message to begin.", metadata: null });
   render(state);
 
   process.stdin.on("data", (data: Buffer) => {
