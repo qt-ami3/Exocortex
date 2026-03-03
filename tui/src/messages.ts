@@ -11,12 +11,6 @@
 
 export type ModelId = "sonnet" | "haiku" | "opus";
 
-export const MODEL_MAP: Record<ModelId, string> = {
-  sonnet: "claude-sonnet-4-6",
-  haiku:  "claude-haiku-4-5-20251001",
-  opus:   "claude-opus-4-6",
-};
-
 // ── Blocks ──────────────────────────────────────────────────────────
 
 export interface ThinkingBlock {
@@ -59,7 +53,7 @@ export interface AIMessage {
   blocks: Block[];
   model?: ModelId;
   tokens?: number;
-  /** Timestamp (ms) when the daemon began processing this message. */
+  /** Timestamp (ms) when the client sent this message. Client-originated. */
   startedAt: number;
   /** Timestamp (ms) when the daemon finished. Null while streaming. */
   endedAt: number | null;

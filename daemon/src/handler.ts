@@ -8,7 +8,6 @@
 
 import { log } from "./log";
 import { loadAuth } from "./store";
-import { AuthError } from "./api";
 import { runAgentLoop, type AgentCallbacks } from "./agent";
 import { buildSystemPrompt } from "./system";
 import * as convStore from "./conversations";
@@ -100,7 +99,7 @@ async function handleSendMessage(
     server.sendTo(client, { type: "error", reqId, convId, message: `Conversation ${convId} not found` });
     return;
   }
-  if (conv.streaming) {
+  if (convStore.isStreaming(convId)) {
     server.sendTo(client, { type: "error", reqId, convId, message: "Already streaming" });
     return;
   }
@@ -109,8 +108,6 @@ async function handleSendMessage(
 
   const ac = new AbortController();
   convStore.setActiveJob(convId, ac);
-  conv.streaming = true;
-  conv.abortController = ac;
 
   server.broadcast({ type: "streaming_started", convId, model: conv.model });
 
@@ -180,8 +177,6 @@ async function handleSendMessage(
     server.sendToSubscribers(convId, { type: "error", convId, message: msg });
   } finally {
     convStore.clearActiveJob(convId);
-    conv.streaming = false;
-    conv.abortController = null;
     server.broadcast({ type: "streaming_stopped", convId });
   }
 }

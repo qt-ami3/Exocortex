@@ -33,6 +33,11 @@ export function get(id: string): Conversation | undefined {
 
 // ── Active jobs (abort controllers for in-flight streams) ───────────
 
+/** Streaming state is derived from activeJobs — no boolean on Conversation. */
+export function isStreaming(convId: string): boolean {
+  return activeJobs.has(convId);
+}
+
 export function setActiveJob(convId: string, ac: AbortController): void {
   activeJobs.set(convId, ac);
 }
