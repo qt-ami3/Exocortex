@@ -22,7 +22,7 @@ export const whale: Theme = {
 
   // Foreground colors
   accent:   `${ESC}38;2;29;155;240m`,   // #1d9bf0
-  text:     `${ESC}37m`,                 // white
+  text:     `${ESC}38;2;255;255;255m`,    // #ffffff
   muted:    `${ESC}38;2;100;100;100m`,   // #646464
   error:    `${ESC}31m`,                 // red
   warning:  `${ESC}33m`,                 // yellow
