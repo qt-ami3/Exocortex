@@ -141,6 +141,8 @@ export function getInputLines(
   maxWidth: number,
   maxRows: number,
 ): InputLinesResult {
+  // Guard against zero/negative width — would cause infinite loop in hard-wrap
+  if (maxWidth < 1) maxWidth = 1;
   const bufferLines = buffer.split("\n");
   const wrapped: string[] = [];
   const isNewLineArr: boolean[] = [];

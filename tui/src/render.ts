@@ -31,7 +31,7 @@ export function render(state: RenderState): void {
   const sidebarOpen = state.sidebar.open;
   const sidebarW = sidebarOpen ? SIDEBAR_WIDTH : 0;
   const chatCol = sidebarW + 1;            // 1-based column where chat starts
-  const chatW = cols - sidebarW;           // width available for chat area
+  const chatW = Math.max(1, cols - sidebarW); // width available for chat area
 
   // ── Pre-render sidebar ────────────────────────────────────────
   // renderSidebar returns one row per screen row: header, separator,
