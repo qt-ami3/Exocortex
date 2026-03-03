@@ -1,36 +1,12 @@
 /**
- * TUI state model.
+ * TUI render state.
  *
- * Defines the message types (user, assistant, system) and the
- * block-based structure of AI messages. The renderer and event
- * handler both operate on these types.
+ * Owns the shape of the UI state that drives rendering.
+ * Message and block types live in messages.ts.
  */
 
-import type { ModelId, Block } from "./protocol";
-
-// ── Message types ───────────────────────────────────────────────────
-
-export interface UserMessage {
-  role: "user";
-  text: string;
-}
-
-export interface AIMessage {
-  role: "assistant";
-  blocks: Block[];
-  model?: ModelId;
-  tokens?: number;
-  durationMs?: number;
-}
-
-export interface SystemMessage {
-  role: "system";
-  text: string;
-}
-
-export type Message = UserMessage | AIMessage | SystemMessage;
-
-// ── Render state ────────────────────────────────────────────────────
+import type { ModelId } from "./messages";
+import type { Message, AIMessage } from "./messages";
 
 export interface RenderState {
   messages: Message[];

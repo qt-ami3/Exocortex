@@ -8,7 +8,7 @@
 import { loadAuth, isTokenExpired, saveAuth } from "./store";
 import { refreshTokens, AuthError } from "./auth";
 import { log } from "./log";
-import type { ModelId } from "./protocol";
+import type { ModelId } from "./messages";
 
 export { AuthError };
 

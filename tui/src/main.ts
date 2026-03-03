@@ -11,8 +11,9 @@
 import { DaemonClient } from "./client";
 import { parseKeys, type KeyEvent } from "./input";
 import { render, enter_alt, leave_alt, hide_cursor, show_cursor } from "./render";
-import { createInitialState, type AIMessage } from "./state";
-import type { Event, ModelId, Block } from "./protocol";
+import { createInitialState } from "./state";
+import { createPendingAI, ensureCurrentBlock, type ModelId } from "./messages";
+import type { Event } from "./protocol";
 
 // ── State ───────────────────────────────────────────────────────────
 
@@ -32,24 +33,6 @@ function scheduleRender(): void {
     renderTimer = null;
     render(state);
   }, 16);
-}
-
-// ── Pending AI helpers ──────────────────────────────────────────────
-
-/** Get or create the last block of the given type in the pending AI message. */
-function ensureCurrentBlock(type: "text" | "thinking"): Block {
-  if (!state.pendingAI) return { type, text: "" };
-
-  const blocks = state.pendingAI.blocks;
-  const last = blocks[blocks.length - 1];
-
-  // Reuse the last block if it matches the type
-  if (last && last.type === type) return last;
-
-  // Otherwise start a new block
-  const block: Block = { type, text: "" };
-  blocks.push(block);
-  return block;
 }
 
 // ── Event handler (daemon → TUI) ───────────────────────────────────
@@ -75,7 +58,7 @@ function handleEvent(event: Event): void {
       state.streaming = true;
       state.streamStartedAt = event.startedAt;
       state.scrollOffset = 0;
-      state.pendingAI = { role: "assistant", blocks: [] };
+      state.pendingAI = createPendingAI();
 
       if (streamTimer) clearInterval(streamTimer);
       streamTimer = setInterval(scheduleRender, 1000);
@@ -90,15 +73,19 @@ function handleEvent(event: Event): void {
     }
 
     case "text_chunk": {
-      const block = ensureCurrentBlock("text");
-      if (block.type === "text") block.text += event.text;
+      if (state.pendingAI) {
+        const block = ensureCurrentBlock(state.pendingAI, "text");
+        if (block.type === "text") block.text += event.text;
+      }
       state.scrollOffset = 0;
       break;
     }
 
     case "thinking_chunk": {
-      const block = ensureCurrentBlock("thinking");
-      if (block.type === "thinking") block.text += event.text;
+      if (state.pendingAI) {
+        const block = ensureCurrentBlock(state.pendingAI, "thinking");
+        if (block.type === "thinking") block.text += event.text;
+      }
       break;
     }
 

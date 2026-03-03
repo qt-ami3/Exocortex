@@ -4,48 +4,14 @@
  * Transport: Unix domain socket, newline-delimited JSON.
  * Commands flow client → daemon. Events flow daemon → client.
  *
+ * Message and block types live in messages.ts — this file is
+ * purely the wire contract.
+ *
  * NOTE: Independent copy of the daemon's protocol.ts. Keep in sync.
  */
 
-// ── Models ──────────────────────────────────────────────────────────
-
-export type ModelId = "sonnet" | "haiku" | "opus";
-
-export const MODEL_MAP: Record<ModelId, string> = {
-  sonnet: "claude-sonnet-4-6",
-  haiku:  "claude-haiku-4-5-20251001",
-  opus:   "claude-opus-4-6",
-};
-
-// ── Blocks (the atoms of an AI message) ─────────────────────────────
-
-export interface ThinkingBlock {
-  type: "thinking";
-  text: string;
-}
-
-export interface TextBlock {
-  type: "text";
-  text: string;
-}
-
-export interface ToolCallBlock {
-  type: "tool_call";
-  toolCallId: string;
-  toolName: string;
-  input: Record<string, unknown>;
-  summary: string;
-}
-
-export interface ToolResultBlock {
-  type: "tool_result";
-  toolCallId: string;
-  toolName: string;
-  output: string;
-  isError: boolean;
-}
-
-export type Block = ThinkingBlock | TextBlock | ToolCallBlock | ToolResultBlock;
+import type { ModelId, Block } from "./messages";
+export type { ModelId, Block };
 
 // ── Commands (client → daemon) ──────────────────────────────────────
 
@@ -124,8 +90,6 @@ export interface StreamingStoppedEvent {
   type: "streaming_stopped";
   convId: string;
 }
-
-// ── Block-level streaming events (sent to subscribers) ──────────────
 
 export interface BlockStartEvent {
   type: "block_start";

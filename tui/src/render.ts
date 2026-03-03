@@ -5,8 +5,8 @@
  * Uses ANSI escape codes for cursor positioning and colors.
  */
 
-import type { Block } from "./protocol";
-import type { RenderState, Message, AIMessage } from "./state";
+import type { Block, AIMessage } from "./messages";
+import type { RenderState } from "./state";
 
 // ── ANSI helpers ────────────────────────────────────────────────────
 

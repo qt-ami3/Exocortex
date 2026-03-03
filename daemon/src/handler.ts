@@ -7,27 +7,16 @@
 
 import { log } from "./log";
 import { loadAuth } from "./store";
-import { AuthError } from "./api";
+import { AuthError, type ApiMessage } from "./api";
 import { runAgentLoop, type AgentCallbacks } from "./agent";
 import { DaemonServer, type ConnectedClient } from "./server";
-import type { Command, ModelId, Block } from "./protocol";
-import type { ApiMessage } from "./api";
+import type { Command } from "./protocol";
+import {
+  type ModelId, type Block, type Conversation,
+  createConversation,
+} from "./messages";
 
 // ── Conversation state ──────────────────────────────────────────────
-
-interface StoredMessage {
-  role: "user" | "assistant";
-  content: ApiMessage["content"];
-}
-
-interface Conversation {
-  id: string;
-  model: ModelId;
-  messages: StoredMessage[];
-  streaming: boolean;
-  abortController: AbortController | null;
-  createdAt: number;
-}
 
 const conversations = new Map<string, Conversation>();
 const activeJobs = new Map<string, AbortController>();
@@ -67,11 +56,7 @@ export function createHandler(server: DaemonServer) {
       case "new_conversation": {
         const id = generateId();
         const model = cmd.model ?? "sonnet";
-        const conv: Conversation = {
-          id, model, messages: [],
-          streaming: false, abortController: null,
-          createdAt: Date.now(),
-        };
+        const conv = createConversation(id, model);
         conversations.set(id, conv);
         log("info", `handler: created conversation ${id} (model=${model})`);
 

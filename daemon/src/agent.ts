@@ -11,7 +11,7 @@
 
 import { streamMessage, type ApiMessage, type ApiToolCall, type ContentBlock } from "./api";
 import { log } from "./log";
-import type { ModelId, Block, ToolCallBlock, ToolResultBlock } from "./protocol";
+import type { ModelId, Block, ToolCallBlock, ToolResultBlock } from "./messages";
 
 // ── Callbacks ───────────────────────────────────────────────────────
 
