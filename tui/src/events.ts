@@ -18,6 +18,7 @@ import type { AIMessage } from "./messages";
 
 export interface DaemonActions {
   subscribe(convId: string): void;
+  unsubscribe(convId: string): void;
   sendMessage(convId: string, text: string, startedAt: number): void;
 }
 
@@ -59,11 +60,13 @@ export function handleEvent(
     }
 
     case "streaming_started": {
+      if (event.convId !== state.convId) break;
       state.scrollOffset = 0;
       break;
     }
 
     case "block_start": {
+      if (event.convId !== state.convId) break;
       if (state.pendingAI) {
         state.pendingAI.blocks.push({ type: event.blockType, text: "" });
       }
@@ -71,6 +74,7 @@ export function handleEvent(
     }
 
     case "text_chunk": {
+      if (event.convId !== state.convId) break;
       if (state.pendingAI) {
         const block = ensureCurrentBlock(state.pendingAI, "text");
         if (block.type === "text") block.text += event.text;
@@ -80,6 +84,7 @@ export function handleEvent(
     }
 
     case "thinking_chunk": {
+      if (event.convId !== state.convId) break;
       if (state.pendingAI) {
         const block = ensureCurrentBlock(state.pendingAI, "thinking");
         if (block.type === "thinking") block.text += event.text;
@@ -88,6 +93,7 @@ export function handleEvent(
     }
 
     case "tool_call": {
+      if (event.convId !== state.convId) break;
       if (state.pendingAI) {
         state.pendingAI.blocks.push({
           type: "tool_call",
@@ -101,6 +107,7 @@ export function handleEvent(
     }
 
     case "tool_result": {
+      if (event.convId !== state.convId) break;
       if (state.pendingAI) {
         state.pendingAI.blocks.push({
           type: "tool_result",
@@ -114,6 +121,7 @@ export function handleEvent(
     }
 
     case "tokens_update": {
+      if (event.convId !== state.convId) break;
       if (state.pendingAI) {
         state.pendingAI.metadata.tokens = event.tokens;
       }
@@ -121,11 +129,13 @@ export function handleEvent(
     }
 
     case "context_update": {
+      if (event.convId !== state.convId) break;
       state.contextTokens = event.contextTokens;
       break;
     }
 
     case "message_complete": {
+      if (event.convId !== state.convId) break;
       if (state.pendingAI) {
         state.pendingAI.metadata.endedAt = event.endedAt;
         state.messages.push(state.pendingAI);
@@ -135,6 +145,7 @@ export function handleEvent(
     }
 
     case "streaming_stopped": {
+      if (event.convId !== state.convId) break;
       const wasInterrupted = state.pendingAI !== null;
       if (state.pendingAI && state.pendingAI.blocks.length > 0) {
         state.pendingAI.metadata.endedAt ??= Date.now();
@@ -179,11 +190,16 @@ export function handleEvent(
     }
 
     case "conversation_loaded": {
+      // Unsubscribe from old conversation before switching
+      if (state.convId && state.convId !== event.convId) {
+        daemon.unsubscribe(state.convId);
+      }
       state.messages = [];
       state.pendingAI = null;
       state.convId = event.convId;
       state.model = event.model;
       state.scrollOffset = 0;
+      state.contextTokens = null;
 
       const totalPairs = Math.max(event.userMessages.length, event.aiMessages.length);
       let userIdx = 0;

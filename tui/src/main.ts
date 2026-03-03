@@ -74,6 +74,10 @@ function handleSubmit(): void {
   const cmdResult = tryCommand(text, state);
   if (cmdResult) {
     if (cmdResult.type === "quit") { running = false; return; }
+    if (cmdResult.type === "new_conversation") {
+      if (state.convId) daemon.unsubscribe(state.convId);
+      state.convId = null;
+    }
     scheduleRender();
     return;
   }

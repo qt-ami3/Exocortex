@@ -16,7 +16,8 @@ import type { ModelId } from "./messages";
 
 export type CommandResult =
   | { type: "handled" }
-  | { type: "quit" };
+  | { type: "quit" }
+  | { type: "new_conversation" };
 
 export interface SlashCommand {
   name: string;
@@ -56,11 +57,12 @@ const commands: SlashCommand[] = [
     description: "Start a new conversation",
     handler: (_text, state) => {
       state.messages = [];
-      state.convId = null;
       state.pendingAI = null;
       clearPrompt(state);
       state.scrollOffset = 0;
-      return { type: "handled" };
+      state.contextTokens = null;
+      // Return new_conversation so main.ts can unsubscribe + clear convId
+      return { type: "new_conversation" };
     },
   },
   {

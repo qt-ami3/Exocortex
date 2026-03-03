@@ -13,7 +13,7 @@ import { runAgentLoop, type AgentCallbacks } from "./agent";
 import { buildSystemPrompt } from "./system";
 import * as convStore from "./conversations";
 import type { DaemonServer, ConnectedClient } from "./server";
-import type { Block, ApiMessage } from "./messages";
+import type { Block, ApiMessage, ApiContentBlock } from "./messages";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -111,16 +111,21 @@ export async function orchestrateSendMessage(
       signal: ac.signal,
     });
 
-    const textContent = result.blocks
-      .filter((b): b is Extract<Block, { type: "text" }> => b.type === "text")
-      .map(b => b.text)
-      .join("\n");
+    // Store full content blocks (thinking + text) for proper reload & API continuity
+    const assistantContent: ApiContentBlock[] = [];
+    for (const b of result.blocks) {
+      if (b.type === "thinking") {
+        assistantContent.push({ type: "thinking", thinking: b.text, signature: "" });
+      } else if (b.type === "text") {
+        assistantContent.push({ type: "text", text: b.text });
+      }
+    }
 
     const endedAt = Date.now();
 
     conv.messages.push({
       role: "assistant",
-      content: textContent,
+      content: assistantContent,
       metadata: {
         startedAt,
         endedAt,
