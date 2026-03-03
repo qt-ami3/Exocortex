@@ -24,6 +24,7 @@ let pendingSendAfterCreate = false;
 let pendingMessageText = "";
 let renderTimer: ReturnType<typeof setTimeout> | null = null;
 let streamTickTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingErrors: string[] = [];
 
 // ── Render scheduling ───────────────────────────────────────────────
 
@@ -143,6 +144,13 @@ function handleEvent(event: Event): void {
         state.messages.push(state.pendingAI);
       }
       state.pendingAI = null;
+
+      // Flush errors that arrived during streaming (after the AI message)
+      for (const msg of pendingErrors) {
+        state.messages.push({ role: "system", text: `✗ ${msg}`, metadata: null });
+      }
+      pendingErrors = [];
+
       if (wasInterrupted) {
         state.messages.push({ role: "system", text: "• Interrupted", color: "\x1b[31m", metadata: null });
       }
@@ -151,7 +159,11 @@ function handleEvent(event: Event): void {
     }
 
     case "error": {
-      state.messages.push({ role: "system", text: `✗ ${event.message}`, metadata: null });
+      if (isStreaming(state)) {
+        pendingErrors.push(event.message);
+      } else {
+        state.messages.push({ role: "system", text: `✗ ${event.message}`, metadata: null });
+      }
       break;
     }
 
