@@ -138,6 +138,7 @@ function handleEvent(event: Event): void {
     case "streaming_stopped": {
       // If pendingAI wasn't finalized (e.g. error/abort), push what we have
       if (state.pendingAI && state.pendingAI.blocks.length > 0) {
+        state.pendingAI.metadata.endedAt ??= Date.now();
         state.messages.push(state.pendingAI);
       }
       state.pendingAI = null;
