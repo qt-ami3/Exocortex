@@ -13,7 +13,6 @@ export interface RenderState {
   /** The AI message currently being streamed (not yet finalized). */
   pendingAI: AIMessage | null;
   streaming: boolean;
-  streamStartedAt: number | null;
   model: ModelId;
   convId: string | null;
   inputBuffer: string;
@@ -28,7 +27,6 @@ export function createInitialState(): RenderState {
     messages: [],
     pendingAI: null,
     streaming: false,
-    streamStartedAt: null,
     model: "sonnet",
     convId: null,
     inputBuffer: "",

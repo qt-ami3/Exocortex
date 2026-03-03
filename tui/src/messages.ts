@@ -59,7 +59,10 @@ export interface AIMessage {
   blocks: Block[];
   model?: ModelId;
   tokens?: number;
-  durationMs?: number;
+  /** Timestamp (ms) when the daemon began processing this message. */
+  startedAt: number;
+  /** Timestamp (ms) when the daemon finished. Null while streaming. */
+  endedAt: number | null;
 }
 
 /**
@@ -76,8 +79,8 @@ export type Message = UserMessage | AIMessage | SystemMessage;
 // ── Helpers ─────────────────────────────────────────────────────────
 
 /** Create a fresh pending AI message for streaming. */
-export function createPendingAI(): AIMessage {
-  return { role: "assistant", blocks: [] };
+export function createPendingAI(startedAt: number): AIMessage {
+  return { role: "assistant", blocks: [], startedAt, endedAt: null };
 }
 
 /**

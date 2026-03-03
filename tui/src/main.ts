@@ -56,9 +56,8 @@ function handleEvent(event: Event): void {
 
     case "streaming_started": {
       state.streaming = true;
-      state.streamStartedAt = event.startedAt;
       state.scrollOffset = 0;
-      state.pendingAI = createPendingAI();
+      state.pendingAI = createPendingAI(event.startedAt);
 
       if (streamTimer) clearInterval(streamTimer);
       streamTimer = setInterval(scheduleRender, 1000);
@@ -116,12 +115,10 @@ function handleEvent(event: Event): void {
     }
 
     case "message_complete": {
-      // Finalize the pending AI message with server-provided data
       if (state.pendingAI) {
         state.pendingAI.model = event.model;
         state.pendingAI.tokens = event.tokens;
-        state.pendingAI.durationMs = event.durationMs;
-        // Use blocks from pending (already built incrementally)
+        state.pendingAI.endedAt = event.endedAt;
         state.messages.push(state.pendingAI);
         state.pendingAI = null;
       }
@@ -130,7 +127,6 @@ function handleEvent(event: Event): void {
 
     case "streaming_stopped": {
       state.streaming = false;
-      state.streamStartedAt = null;
       // If pendingAI wasn't finalized (e.g. error/abort), push what we have
       if (state.pendingAI && state.pendingAI.blocks.length > 0) {
         state.messages.push(state.pendingAI);

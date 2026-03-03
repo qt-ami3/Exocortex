@@ -116,16 +116,12 @@ function renderAIMessage(
   msg: AIMessage,
   contentWidth: number,
   isStreaming: boolean,
-  elapsed: number,
 ): string[] {
   const lines: string[] = [];
 
-  // Header
-  const dur = msg.durationMs
-    ? `${DIM} · ${formatDuration(msg.durationMs)}${RESET}`
-    : isStreaming && elapsed > 0
-      ? `${DIM} · ${formatDuration(elapsed)}${RESET}`
-      : "";
+  // Header — duration is always derived from the message timestamps
+  const elapsed = (msg.endedAt ?? Date.now()) - msg.startedAt;
+  const dur = elapsed > 0 ? `${DIM} · ${formatDuration(elapsed)}${RESET}` : "";
   lines.push(`${BOLD}${GREEN}  ▌Claude${RESET}${dur}`);
 
   // Empty pending message → "thinking..."
@@ -162,7 +158,7 @@ function buildMessageLines(state: RenderState): string[] {
         lines.push(`  ${wl}`);
       }
     } else if (msg.role === "assistant") {
-      lines.push(...renderAIMessage(msg, contentWidth, false, 0));
+      lines.push(...renderAIMessage(msg, contentWidth, false));
     } else {
       lines.push(`  ${DIM}${msg.text}${RESET}`);
     }
@@ -171,8 +167,7 @@ function buildMessageLines(state: RenderState): string[] {
   // Currently streaming AI message
   if (state.pendingAI) {
     lines.push("");
-    const elapsed = state.streamStartedAt ? Date.now() - state.streamStartedAt : 0;
-    lines.push(...renderAIMessage(state.pendingAI, contentWidth, true, elapsed));
+    lines.push(...renderAIMessage(state.pendingAI, contentWidth, true));
   }
 
   return lines;

@@ -197,16 +197,17 @@ async function handleSendMessage(
 
     conv.messages.push({ role: "assistant", content: textContent });
 
+    const endedAt = Date.now();
     server.sendToSubscribers(convId, {
       type: "message_complete",
       convId,
       blocks: result.blocks,
       model: result.model,
       tokens: result.tokens,
-      durationMs: result.durationMs,
+      endedAt,
     });
 
-    log("info", `handler: message complete for ${convId} (${result.tokens} tokens, ${result.blocks.length} blocks, ${result.durationMs}ms)`);
+    log("info", `handler: message complete for ${convId} (${result.tokens} tokens, ${result.blocks.length} blocks, ${endedAt - startedAt}ms)`);
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

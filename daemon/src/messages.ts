@@ -61,7 +61,10 @@ export interface AIMessage {
   blocks: Block[];
   model?: ModelId;
   tokens?: number;
-  durationMs?: number;
+  /** Timestamp (ms) when the daemon began processing this message. */
+  startedAt: number;
+  /** Timestamp (ms) when the daemon finished. Null while streaming. */
+  endedAt: number | null;
 }
 
 /**

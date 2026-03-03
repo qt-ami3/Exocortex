@@ -131,7 +131,7 @@ export interface MessageCompleteEvent {
   blocks: Block[];
   model: ModelId;
   tokens?: number;
-  durationMs?: number;
+  endedAt: number;
 }
 
 export interface ErrorEvent {
