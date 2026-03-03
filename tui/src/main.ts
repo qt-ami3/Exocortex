@@ -23,16 +23,26 @@ let daemon: DaemonClient;
 let pendingSendAfterCreate = false;
 let pendingMessageText = "";
 let renderTimer: ReturnType<typeof setTimeout> | null = null;
-let streamTimer: ReturnType<typeof setInterval> | null = null;
+let streamTickTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ── Render scheduling ───────────────────────────────────────────────
 
+/** Schedule a render on the next frame. Resets the 1s stream tick. */
 function scheduleRender(): void {
   if (renderTimer) return;
   renderTimer = setTimeout(() => {
     renderTimer = null;
     render(state);
+    resetStreamTick();
   }, 16);
+}
+
+/** During streaming, ensure we re-render at least once per second. */
+function resetStreamTick(): void {
+  if (streamTickTimer) clearTimeout(streamTickTimer);
+  if (state.streaming) {
+    streamTickTimer = setTimeout(scheduleRender, 1000);
+  }
 }
 
 // ── Event handler (daemon → TUI) ───────────────────────────────────
@@ -58,9 +68,6 @@ function handleEvent(event: Event): void {
       state.streaming = true;
       state.scrollOffset = 0;
       state.pendingAI = createPendingAI(event.startedAt);
-
-      if (streamTimer) clearInterval(streamTimer);
-      streamTimer = setInterval(scheduleRender, 1000);
       break;
     }
 
@@ -132,7 +139,7 @@ function handleEvent(event: Event): void {
         state.messages.push(state.pendingAI);
       }
       state.pendingAI = null;
-      if (streamTimer) { clearInterval(streamTimer); streamTimer = null; }
+      if (streamTickTimer) { clearTimeout(streamTickTimer); streamTickTimer = null; }
       break;
     }
 
@@ -322,7 +329,7 @@ async function main(): Promise<void> {
 }
 
 function cleanup(): void {
-  if (streamTimer) clearInterval(streamTimer);
+  if (streamTickTimer) clearTimeout(streamTickTimer);
   daemon?.disconnect();
   restoreTerminal();
   process.exit(0);
