@@ -326,8 +326,8 @@ export function render(state: RenderState): void {
   const inputRowCount = inputLines.length;
 
   // ── Bottom layout: sep | input rows | sep | status ────────────
-  const slHeight = statusLineHeight(state, cols);
-  const statusLines = renderStatusLine(state, cols);
+  const slHeight = statusLineHeight(state, chatW);
+  const statusLines = renderStatusLine(state, chatW);
   const bottomUsed = 1 + inputRowCount + 1 + slHeight;
   const sepAbove = rows - bottomUsed + 1;
   const firstInputRow = sepAbove + 1;
@@ -392,10 +392,14 @@ export function render(state: RenderState): void {
   }
   out.push(move_to(sepBelow, chatCol) + `${promptColor}${"─".repeat(chatW)}${theme.reset}`);
 
-  // ── Status lines (full width) ─────────────────────────────────
+  // ── Status lines (chat area width) ─────────────────────────────
   for (let i = 0; i < slHeight; i++) {
-    out.push(move_to(sepBelow + 1 + i, 1) + clear_line);
-    out.push(statusLines[i]);
+    const row = sepBelow + 1 + i;
+    out.push(move_to(row, 1) + clear_line);
+    if (sidebarOpen && sbRows[row - 1]) {
+      out.push(sbRows[row - 1]);
+    }
+    out.push(move_to(row, chatCol) + statusLines[i]);
   }
 
   // ── Position cursor in input field ────────────────────────────

@@ -35,7 +35,7 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
       return { type: "quit" };
     case "escape":
       return { type: "abort" };
-    case "ctrl-b":
+    case "ctrl-m":
       // Toggle sidebar open/close + focus
       state.sidebar.open = !state.sidebar.open;
       state.panelFocus = state.sidebar.open ? "sidebar" : "chat";

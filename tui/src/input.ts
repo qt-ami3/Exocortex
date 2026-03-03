@@ -8,7 +8,7 @@ export interface KeyEvent {
   type: "char" | "enter" | "backspace" | "delete"
       | "left" | "right" | "home" | "end"
       | "up" | "down"
-      | "ctrl-b" | "ctrl-c" | "ctrl-d" | "ctrl-k" | "ctrl-l" | "ctrl-n" | "escape"
+      | "ctrl-c" | "ctrl-d" | "ctrl-k" | "ctrl-l" | "ctrl-m" | "ctrl-n" | "escape"
       | "unknown";
   char?: string;
 }
@@ -22,8 +22,6 @@ export function parseKeys(data: Buffer): KeyEvent[] {
     const ch = str[i];
     const code = str.charCodeAt(i);
 
-    // Ctrl+B (sidebar toggle)
-    if (code === 2) { events.push({ type: "ctrl-b" }); i++; continue; }
     // Ctrl+C
     if (code === 3) { events.push({ type: "ctrl-c" }); i++; continue; }
     // Ctrl+D
@@ -43,16 +41,42 @@ export function parseKeys(data: Buffer): KeyEvent[] {
       // Bare escape
       if (i + 1 >= str.length) { events.push({ type: "escape" }); i++; continue; }
       if (str[i + 1] === "[") {
-        const seq = str.slice(i + 2, i + 6);
-        if (seq[0] === "A") { events.push({ type: "up" }); i += 3; continue; }
-        if (seq[0] === "B") { events.push({ type: "down" }); i += 3; continue; }
-        if (seq[0] === "C") { events.push({ type: "right" }); i += 3; continue; }
-        if (seq[0] === "D") { events.push({ type: "left" }); i += 3; continue; }
-        if (seq[0] === "H") { events.push({ type: "home" }); i += 3; continue; }
-        if (seq[0] === "F") { events.push({ type: "end" }); i += 3; continue; }
-        if (seq.startsWith("3~")) { events.push({ type: "delete" }); i += 4; continue; }
-        if (seq.startsWith("1~")) { events.push({ type: "home" }); i += 4; continue; }
-        if (seq.startsWith("4~")) { events.push({ type: "end" }); i += 4; continue; }
+        // Parse full CSI sequence: ESC [ <params> <final byte>
+        // Find the end of the sequence (final byte is 0x40-0x7E)
+        let j = i + 2;
+        while (j < str.length && (str.charCodeAt(j) < 0x40 || str.charCodeAt(j) > 0x7E)) j++;
+        if (j < str.length) {
+          const params = str.slice(i + 2, j);
+          const final = str[j];
+          const seqLen = j - i + 1;
+
+          // CSI u (kitty/st extended keys): ESC [ <keycode> ; <modifiers> u
+          if (final === "u") {
+            const parts = params.split(";");
+            const keycode = parseInt(parts[0], 10);
+            const mods = parseInt(parts[1] ?? "1", 10);
+            const ctrl = (mods & 4) !== 0;
+            if (ctrl && keycode === 109) { events.push({ type: "ctrl-m" }); i += seqLen; continue; }
+            // Unknown CSI u — skip
+            i += seqLen;
+            continue;
+          }
+
+          // Standard CSI sequences
+          if (params === "" && final === "A") { events.push({ type: "up" }); i += seqLen; continue; }
+          if (params === "" && final === "B") { events.push({ type: "down" }); i += seqLen; continue; }
+          if (params === "" && final === "C") { events.push({ type: "right" }); i += seqLen; continue; }
+          if (params === "" && final === "D") { events.push({ type: "left" }); i += seqLen; continue; }
+          if (params === "" && final === "H") { events.push({ type: "home" }); i += seqLen; continue; }
+          if (params === "" && final === "F") { events.push({ type: "end" }); i += seqLen; continue; }
+          if (params === "3" && final === "~") { events.push({ type: "delete" }); i += seqLen; continue; }
+          if (params === "1" && final === "~") { events.push({ type: "home" }); i += seqLen; continue; }
+          if (params === "4" && final === "~") { events.push({ type: "end" }); i += seqLen; continue; }
+
+          // Unknown CSI — skip the full sequence
+          i += seqLen;
+          continue;
+        }
       }
       events.push({ type: "escape" });
       i++;
