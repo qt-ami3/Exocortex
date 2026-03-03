@@ -8,7 +8,7 @@ export interface KeyEvent {
   type: "char" | "enter" | "backspace" | "delete"
       | "left" | "right" | "home" | "end"
       | "up" | "down"
-      | "ctrl-c" | "ctrl-d" | "ctrl-k" | "ctrl-l" | "ctrl-m" | "ctrl-n" | "escape"
+      | "ctrl-c" | "ctrl-d" | "ctrl-j" | "ctrl-k" | "ctrl-l" | "ctrl-m" | "ctrl-n" | "escape"
       | "unknown";
   char?: string;
 }
@@ -32,8 +32,10 @@ export function parseKeys(data: Buffer): KeyEvent[] {
     if (code === 12) { events.push({ type: "ctrl-l" }); i++; continue; }
     // Ctrl+N (focus switch)
     if (code === 14) { events.push({ type: "ctrl-n" }); i++; continue; }
-    // Enter
-    if (code === 13 || code === 10) { events.push({ type: "enter" }); i++; continue; }
+    // Ctrl+J (LF) — distinct from Enter
+    if (code === 10) { events.push({ type: "ctrl-j" }); i++; continue; }
+    // Enter (CR)
+    if (code === 13) { events.push({ type: "enter" }); i++; continue; }
     // Backspace
     if (code === 127 || code === 8) { events.push({ type: "backspace" }); i++; continue; }
     // Escape sequences

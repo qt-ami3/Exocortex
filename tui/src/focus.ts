@@ -40,6 +40,7 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
       state.sidebar.open = !state.sidebar.open;
       state.panelFocus = state.sidebar.open ? "sidebar" : "chat";
       return { type: "handled" };
+    case "ctrl-j":
     case "ctrl-k":
       // Cycle focus: sidebar ↔ chat (only if sidebar is open)
       if (state.sidebar.open) {
