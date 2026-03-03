@@ -254,7 +254,9 @@ function buildMessageLines(state: RenderState): string[] {
       lines.push(...renderAIMessage(msg, contentWidth));
     } else {
       const color = msg.color || theme.dim;
-      lines.push(`  ${color}${msg.text}${theme.reset}`);
+      for (const sl of msg.text.split("\n")) {
+        lines.push(`  ${color}${sl}${theme.reset}`);
+      }
     }
   }
 
