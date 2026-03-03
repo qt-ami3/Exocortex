@@ -7,6 +7,7 @@
 
 import type { Block, AIMessage } from "./messages";
 import { isStreaming, type RenderState } from "./state";
+import { renderMetadata } from "./metadata";
 
 // ── ANSI helpers ────────────────────────────────────────────────────
 
@@ -54,15 +55,6 @@ function wordWrap(text: string, width: number): string[] {
   }
 
   return result;
-}
-
-// ── Duration formatting ─────────────────────────────────────────────
-
-function formatDuration(ms: number): string {
-  if (ms < 60_000) return `${Math.floor(ms / 1000)}s`;
-  const m = Math.floor(ms / 60_000);
-  const s = Math.round((ms % 60_000) / 1000);
-  return `${m}m ${s}s`;
 }
 
 // ── Block rendering ─────────────────────────────────────────────────
@@ -151,13 +143,8 @@ function renderAIMessage(
     lines.push(...renderBlock(block, contentWidth));
   }
 
-  // Footer: duration (always), streaming cursor
-  const elapsed = (msg.endedAt ?? Date.now()) - msg.startedAt;
-  if (isStreaming) {
-    lines.push(`  ${DIM}${formatDuration(elapsed)} ▍${RESET}`);
-  } else if (elapsed > 0) {
-    lines.push(`  ${DIM}${formatDuration(elapsed)}${RESET}`);
-  }
+  // Metadata
+  lines.push(...renderMetadata(msg.metadata, isStreaming));
 
   return lines;
 }

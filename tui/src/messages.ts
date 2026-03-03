@@ -15,7 +15,11 @@ import type { AIMessage, Block } from "@exocortex/shared/messages";
 
 /** Create a fresh pending AI message for streaming. */
 export function createPendingAI(startedAt: number): AIMessage {
-  return { role: "assistant", blocks: [], startedAt, endedAt: null };
+  return {
+    role: "assistant",
+    blocks: [],
+    metadata: { startedAt, endedAt: null },
+  };
 }
 
 /**

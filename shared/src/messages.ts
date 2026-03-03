@@ -43,22 +43,34 @@ export interface ToolResultBlock {
 
 export type Block = ThinkingBlock | TextBlock | ToolCallBlock | ToolResultBlock;
 
+// ── Message metadata ────────────────────────────────────────────────
+
+/**
+ * Metadata attached to a message. Persisted by the daemon,
+ * rendered by the client. All fields are optional — presence
+ * determines which metadata blocks are displayed.
+ */
+export interface MessageMetadata {
+  /** When the client sent this message. Client-originated. */
+  startedAt: number;
+  /** When the daemon finished. Null while streaming. */
+  endedAt: number | null;
+  model?: ModelId;
+  tokens?: number;
+}
+
 // ── Messages ────────────────────────────────────────────────────────
 
 export interface UserMessage {
   role: "user";
   text: string;
+  metadata: MessageMetadata | null;
 }
 
 export interface AIMessage {
   role: "assistant";
   blocks: Block[];
-  model?: ModelId;
-  tokens?: number;
-  /** Timestamp (ms) when the client sent this message. Client-originated. */
-  startedAt: number;
-  /** Timestamp (ms) when the daemon finished. Null while streaming. */
-  endedAt: number | null;
+  metadata: MessageMetadata;
 }
 
 /**
@@ -68,6 +80,7 @@ export interface AIMessage {
 export interface SystemMessage {
   role: "system";
   text: string;
+  metadata: MessageMetadata | null;
 }
 
 export type Message = UserMessage | AIMessage | SystemMessage;

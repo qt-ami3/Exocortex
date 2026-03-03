@@ -57,7 +57,7 @@ function handleEvent(event: Event): void {
       // If we had a pending message, send it now
       // (the message was already added to state.messages by handleSubmit)
       if (pendingSendAfterCreate && pendingMessageText && state.pendingAI) {
-        daemon.sendMessage(event.convId, pendingMessageText, state.pendingAI.startedAt);
+        daemon.sendMessage(event.convId, pendingMessageText, state.pendingAI.metadata.startedAt);
         pendingMessageText = "";
         pendingSendAfterCreate = false;
       }
@@ -121,9 +121,9 @@ function handleEvent(event: Event): void {
 
     case "message_complete": {
       if (state.pendingAI) {
-        state.pendingAI.model = event.model;
-        state.pendingAI.tokens = event.tokens;
-        state.pendingAI.endedAt = event.endedAt;
+        state.pendingAI.metadata.model = event.model;
+        state.pendingAI.metadata.tokens = event.tokens;
+        state.pendingAI.metadata.endedAt = event.endedAt;
         state.messages.push(state.pendingAI);
         state.pendingAI = null;
       }
@@ -141,7 +141,7 @@ function handleEvent(event: Event): void {
     }
 
     case "error": {
-      state.messages.push({ role: "system", text: `✗ ${event.message}` });
+      state.messages.push({ role: "system", text: `✗ ${event.message}`, metadata: null });
       break;
     }
 
@@ -180,9 +180,9 @@ function handleSubmit(): void {
     const parts = text.split(/\s+/);
     if (parts[1] && ["sonnet", "haiku", "opus"].includes(parts[1])) {
       state.model = parts[1] as ModelId;
-      state.messages.push({ role: "system", text: `Model set to ${state.model}` });
+      state.messages.push({ role: "system", text: `Model set to ${state.model}`, metadata: null });
     } else {
-      state.messages.push({ role: "system", text: `Current: ${state.model}. Available: sonnet, haiku, opus` });
+      state.messages.push({ role: "system", text: `Current: ${state.model}. Available: sonnet, haiku, opus`, metadata: null });
     }
     state.inputBuffer = "";
     state.cursorPos = 0;
@@ -196,14 +196,14 @@ function handleSubmit(): void {
   state.scrollOffset = 0;
 
   if (isStreaming(state)) {
-    state.messages.push({ role: "system", text: "Still streaming — wait or press Escape to abort." });
+    state.messages.push({ role: "system", text: "Still streaming — wait or press Escape to abort.", metadata: null });
     scheduleRender();
     return;
   }
 
   // Create the AI message immediately so the timer starts now
   const startedAt = Date.now();
-  state.messages.push({ role: "user", text });
+  state.messages.push({ role: "user", text, metadata: null });
   state.pendingAI = createPendingAI(startedAt);
 
   // If no conversation yet, create one first
@@ -298,7 +298,7 @@ async function main(): Promise<void> {
 
   daemon.onConnectionLost(() => {
     state.pendingAI = null;
-    state.messages.push({ role: "system", text: "⚠ Lost connection to daemon." });
+    state.messages.push({ role: "system", text: "⚠ Lost connection to daemon.", metadata: null });
     scheduleRender();
     setTimeout(() => { running = false; }, 2000);
   });
@@ -311,7 +311,7 @@ async function main(): Promise<void> {
     scheduleRender();
   });
 
-  state.messages.push({ role: "system", text: "Connected to exocortexd. Type a message to begin." });
+  state.messages.push({ role: "system", text: "Connected to exocortexd. Type a message to begin.", metadata: null });
   render(state);
 
   process.stdin.on("data", (data: Buffer) => {
