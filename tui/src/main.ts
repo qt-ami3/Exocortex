@@ -11,7 +11,7 @@
 import { DaemonClient } from "./client";
 import { parseKeys, type KeyEvent } from "./input";
 import { render, enter_alt, leave_alt, hide_cursor, show_cursor } from "./render";
-import { createInitialState } from "./state";
+import { createInitialState, isStreaming } from "./state";
 import { createPendingAI, ensureCurrentBlock, type ModelId } from "./messages";
 import type { Event } from "./protocol";
 
@@ -40,7 +40,7 @@ function scheduleRender(): void {
 /** During streaming, ensure we re-render at least once per second. */
 function resetStreamTick(): void {
   if (streamTickTimer) clearTimeout(streamTickTimer);
-  if (state.streaming) {
+  if (isStreaming(state)) {
     streamTickTimer = setTimeout(scheduleRender, 1000);
   }
 }
@@ -65,7 +65,6 @@ function handleEvent(event: Event): void {
     }
 
     case "streaming_started": {
-      state.streaming = true;
       state.scrollOffset = 0;
       break;
     }
@@ -132,7 +131,6 @@ function handleEvent(event: Event): void {
     }
 
     case "streaming_stopped": {
-      state.streaming = false;
       // If pendingAI wasn't finalized (e.g. error/abort), push what we have
       if (state.pendingAI && state.pendingAI.blocks.length > 0) {
         state.messages.push(state.pendingAI);
@@ -170,7 +168,6 @@ function handleSubmit(): void {
   if (text === "/new") {
     state.messages = [];
     state.convId = null;
-    state.streaming = false;
     state.pendingAI = null;
     state.inputBuffer = "";
     state.cursorPos = 0;
@@ -198,7 +195,7 @@ function handleSubmit(): void {
   state.cursorPos = 0;
   state.scrollOffset = 0;
 
-  if (state.streaming) {
+  if (isStreaming(state)) {
     state.messages.push({ role: "system", text: "Still streaming — wait or press Escape to abort." });
     scheduleRender();
     return;
@@ -208,7 +205,6 @@ function handleSubmit(): void {
   const startedAt = Date.now();
   state.messages.push({ role: "user", text });
   state.pendingAI = createPendingAI(startedAt);
-  state.streaming = true;
 
   // If no conversation yet, create one first
   if (!state.convId) {
@@ -266,7 +262,7 @@ function handleKey(key: KeyEvent): void {
       break;
     }
     case "escape": {
-      if (state.streaming && state.convId) daemon.abort(state.convId);
+      if (isStreaming(state) && state.convId) daemon.abort(state.convId);
       break;
     }
     case "ctrl-c":
@@ -301,7 +297,6 @@ async function main(): Promise<void> {
   }
 
   daemon.onConnectionLost(() => {
-    state.streaming = false;
     state.pendingAI = null;
     state.messages.push({ role: "system", text: "⚠ Lost connection to daemon." });
     scheduleRender();

@@ -6,7 +6,7 @@
  */
 
 import type { Block, AIMessage } from "./messages";
-import type { RenderState } from "./state";
+import { isStreaming, type RenderState } from "./state";
 
 // ── ANSI helpers ────────────────────────────────────────────────────
 
@@ -199,7 +199,7 @@ export function render(state: RenderState): void {
   const title = `${BOLD} Exocortex${RESET}`;
   const modelLabel = `${DIM}${state.model}${RESET}`;
   const convLabel = state.convId ? `${DIM}${state.convId.slice(0, 12)}${RESET}` : "";
-  const statusDot = state.streaming ? `${YELLOW}●${RESET}` : `${GREEN}●${RESET}`;
+  const statusDot = isStreaming(state) ? `${YELLOW}●${RESET}` : `${GREEN}●${RESET}`;
 
   out.push(move_to(1, 1) + clear_line);
   out.push(`${BG_DARK}${title}  ${statusDot}  ${convLabel}${" ".repeat(Math.max(0, cols - 30 - state.model.length))}${modelLabel} ${RESET}`);

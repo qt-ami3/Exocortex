@@ -8,7 +8,8 @@
 import { loadAuth, isTokenExpired, saveAuth } from "./store";
 import { refreshTokens, AuthError } from "./auth";
 import { log } from "./log";
-import type { ModelId } from "./messages";
+import type { ModelId, ApiMessage, ApiContentBlock } from "./messages";
+export type { ApiMessage, ApiContentBlock };
 
 export { AuthError };
 
@@ -27,17 +28,6 @@ const MODEL_IDS: Record<ModelId, string> = {
 };
 
 // ── Types ───────────────────────────────────────────────────────────
-
-export interface ApiMessage {
-  role: "user" | "assistant";
-  content: string | ApiContentBlock[];
-}
-
-export type ApiContentBlock =
-  | { type: "text"; text: string; cache_control?: { type: "ephemeral" } }
-  | { type: "thinking"; thinking: string; signature: string }
-  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-  | { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean };
 
 /** A tool call parsed from the API response. */
 export interface ApiToolCall {

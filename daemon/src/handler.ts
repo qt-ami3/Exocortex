@@ -1,46 +1,20 @@
 /**
  * Command handler for exocortexd.
  *
- * Routes IPC commands, manages in-memory conversation state,
- * and drives the agent loop for AI responses.
+ * Routes IPC commands and orchestrates the agent loop.
+ * Conversation state lives in conversations.ts.
+ * System prompt lives in system.ts.
  */
 
 import { log } from "./log";
 import { loadAuth } from "./store";
-import { AuthError, type ApiMessage } from "./api";
+import { AuthError } from "./api";
 import { runAgentLoop, type AgentCallbacks } from "./agent";
+import { buildSystemPrompt } from "./system";
+import * as convStore from "./conversations";
 import { DaemonServer, type ConnectedClient } from "./server";
 import type { Command } from "./protocol";
-import {
-  type ModelId, type Block, type Conversation,
-  createConversation,
-} from "./messages";
-
-// ── Conversation state ──────────────────────────────────────────────
-
-const conversations = new Map<string, Conversation>();
-const activeJobs = new Map<string, AbortController>();
-
-function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-// ── System prompt ───────────────────────────────────────────────────
-
-function buildSystemPrompt(): string {
-  const cwd = process.cwd();
-  const date = new Date().toLocaleDateString("en-US", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
-  return [
-    `You are an AI assistant. You are helpful, harmless, and honest.`,
-    ``,
-    `Environment:`,
-    `- Working directory: ${cwd}`,
-    `- Date: ${date}`,
-    `- Platform: ${process.platform} ${process.arch}`,
-  ].join("\n");
-}
+import type { ModelId, Block, ApiMessage } from "./messages";
 
 // ── Handler ─────────────────────────────────────────────────────────
 
@@ -54,10 +28,9 @@ export function createHandler(server: DaemonServer) {
       }
 
       case "new_conversation": {
-        const id = generateId();
+        const id = convStore.generateId();
         const model = cmd.model ?? "sonnet";
-        const conv = createConversation(id, model);
-        conversations.set(id, conv);
+        convStore.create(id, model);
         log("info", `handler: created conversation ${id} (model=${model})`);
 
         server.sendTo(client, {
@@ -81,7 +54,7 @@ export function createHandler(server: DaemonServer) {
       }
 
       case "abort": {
-        const ac = activeJobs.get(cmd.convId);
+        const ac = convStore.getActiveJob(cmd.convId);
         if (ac) {
           ac.abort();
           log("info", `handler: abort requested for ${cmd.convId}`);
@@ -106,7 +79,7 @@ export function createHandler(server: DaemonServer) {
   };
 }
 
-// ── Send message handler ────────────────────────────────────────────
+// ── Send message orchestration ──────────────────────────────────────
 
 async function handleSendMessage(
   server: DaemonServer,
@@ -116,15 +89,13 @@ async function handleSendMessage(
   text: string,
   startedAt: number,
 ): Promise<void> {
-  // Auth check
   const auth = loadAuth();
   if (!auth?.tokens?.accessToken) {
     server.sendTo(client, { type: "error", reqId, convId, message: "Not authenticated. Run: bun run login (in daemon/)" });
     return;
   }
 
-  // Find conversation
-  const conv = conversations.get(convId);
+  const conv = convStore.get(convId);
   if (!conv) {
     server.sendTo(client, { type: "error", reqId, convId, message: `Conversation ${convId} not found` });
     return;
@@ -134,24 +105,20 @@ async function handleSendMessage(
     return;
   }
 
-  // Add user message
   conv.messages.push({ role: "user", content: text });
 
-  // Set up abort
   const ac = new AbortController();
-  activeJobs.set(convId, ac);
+  convStore.setActiveJob(convId, ac);
   conv.streaming = true;
   conv.abortController = ac;
 
   server.broadcast({ type: "streaming_started", convId, model: conv.model });
 
-  // Build API messages from stored conversation
   const apiMessages: ApiMessage[] = conv.messages.map((m) => ({
     role: m.role,
     content: m.content,
   }));
 
-  // Wire callbacks to IPC events
   const callbacks: AgentCallbacks = {
     onBlockStart(blockType) {
       server.sendToSubscribers(convId, { type: "block_start", convId, blockType });
@@ -188,8 +155,6 @@ async function handleSendMessage(
       signal: ac.signal,
     });
 
-    // Store assistant response: extract text blocks for simple storage,
-    // but keep full block data available for the complete event
     const textContent = result.blocks
       .filter((b): b is Extract<Block, { type: "text" }> => b.type === "text")
       .map(b => b.text)
@@ -214,7 +179,7 @@ async function handleSendMessage(
     log("error", `handler: stream error for ${convId}: ${msg}`);
     server.sendToSubscribers(convId, { type: "error", convId, message: msg });
   } finally {
-    activeJobs.delete(convId);
+    convStore.clearActiveJob(convId);
     conv.streaming = false;
     conv.abortController = null;
     server.broadcast({ type: "streaming_stopped", convId });

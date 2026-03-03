@@ -12,7 +12,6 @@ export interface RenderState {
   messages: Message[];
   /** The AI message currently being streamed (not yet finalized). */
   pendingAI: AIMessage | null;
-  streaming: boolean;
   model: ModelId;
   convId: string | null;
   inputBuffer: string;
@@ -22,11 +21,15 @@ export interface RenderState {
   scrollOffset: number;
 }
 
+/** Streaming state is derived from pendingAI — no separate boolean. */
+export function isStreaming(state: RenderState): boolean {
+  return state.pendingAI !== null;
+}
+
 export function createInitialState(): RenderState {
   return {
     messages: [],
     pendingAI: null,
-    streaming: false,
     model: "sonnet",
     convId: null,
     inputBuffer: "",

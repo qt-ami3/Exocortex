@@ -5,9 +5,10 @@
  * conversations. Blocks are the atoms of an AI message. Messages are
  * the units of a conversation. Everything about shape, metadata, and
  * construction of messages lives here.
+ *
+ * Also owns the API-level message types (ApiMessage, ApiContentBlock)
+ * since stored conversations use this format for API replay.
  */
-
-import type { ApiMessage } from "./api";
 
 // ── Models ──────────────────────────────────────────────────────────
 
@@ -49,6 +50,19 @@ export interface ToolResultBlock {
 
 export type Block = ThinkingBlock | TextBlock | ToolCallBlock | ToolResultBlock;
 
+// ── API-level types (for stored conversations / API replay) ─────────
+
+export type ApiContentBlock =
+  | { type: "text"; text: string; cache_control?: { type: "ephemeral" } }
+  | { type: "thinking"; thinking: string; signature: string }
+  | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+  | { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean };
+
+export interface ApiMessage {
+  role: "user" | "assistant";
+  content: string | ApiContentBlock[];
+}
+
 // ── Messages ────────────────────────────────────────────────────────
 
 export interface UserMessage {
@@ -79,18 +93,12 @@ export interface SystemMessage {
 
 export type Message = UserMessage | AIMessage | SystemMessage;
 
-// ── Stored conversation state ───────────────────────────────────────
-
-export interface StoredMessage {
-  role: "user" | "assistant";
-  content: ApiMessage["content"];
-}
+// ── Conversation state ──────────────────────────────────────────────
 
 export interface Conversation {
   id: string;
   model: ModelId;
-  messages: StoredMessage[];
-  systemMessages: SystemMessage[];
+  messages: ApiMessage[];
   streaming: boolean;
   abortController: AbortController | null;
   createdAt: number;
@@ -101,7 +109,6 @@ export function createConversation(id: string, model: ModelId): Conversation {
     id,
     model,
     messages: [],
-    systemMessages: [],
     streaming: false,
     abortController: null,
     createdAt: Date.now(),

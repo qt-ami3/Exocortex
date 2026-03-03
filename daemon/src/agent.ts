@@ -9,9 +9,9 @@
  * response (pure conversation mode).
  */
 
-import { streamMessage, type ApiMessage, type ApiToolCall, type ContentBlock } from "./api";
+import { streamMessage, type ApiToolCall, type ContentBlock } from "./api";
 import { log } from "./log";
-import type { ModelId, Block, ToolCallBlock, ToolResultBlock } from "./messages";
+import type { ModelId, Block, ToolCallBlock, ToolResultBlock, ApiMessage } from "./messages";
 
 // ── Callbacks ───────────────────────────────────────────────────────
 
