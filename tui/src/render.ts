@@ -119,9 +119,14 @@ function renderAIMessage(
 ): string[] {
   const lines: string[] = [];
 
-  // Header — duration is always derived from the message timestamps
+  // Header — duration is always derived from the message timestamps.
+  // While streaming (endedAt null), show whole seconds for a clean tick.
+  // Once complete, show precise time.
   const elapsed = (msg.endedAt ?? Date.now()) - msg.startedAt;
-  const dur = elapsed > 0 ? `${DIM} · ${formatDuration(elapsed)}${RESET}` : "";
+  const durText = msg.endedAt
+    ? formatDuration(elapsed)
+    : `${Math.floor(elapsed / 1000)}s`;
+  const dur = elapsed > 0 ? `${DIM} · ${durText}${RESET}` : "";
   lines.push(`${BOLD}${GREEN}  ▌Claude${RESET}${dur}`);
 
   // Empty pending message → "thinking..."
