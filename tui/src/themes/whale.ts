@@ -30,6 +30,10 @@ export const whale: Theme = {
   prompt:   `${ESC}34m`,                 // blue
   tool:     `${ESC}35m`,                 // magenta
 
+  // Vim mode indicators
+  vimNormal: `${ESC}38;2;72;202;228m`,    // #48cae4
+  vimInsert: `${ESC}38;2;46;196;182m`,    // #2ec4b6
+
   // Background colors
   topbarBg:      `${ESC}48;2;29;155;240m`,    // accent (#1d9bf0) as background
   userBg:        `${ESC}48;2;9;13;53m`,       // #090d35

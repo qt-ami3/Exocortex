@@ -133,7 +133,7 @@ export function render(state: RenderState): void {
     if (vimEnabled) {
       const isFirst = i === 0 && !isNewLine[i];
       const modeChar = state.vim.mode === "normal" ? "N" : "I";
-      const modeColor = state.vim.mode === "normal" ? theme.warning : theme.accent;
+      const modeColor = state.vim.mode === "normal" ? theme.vimNormal : theme.vimInsert;
       if (isFirst) {
         prompt = `${modeColor}${modeChar}${theme.reset} ${promptStyle}${promptGlyph}${theme.reset} `;
       } else {

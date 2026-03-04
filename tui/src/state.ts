@@ -60,6 +60,6 @@ export function createInitialState(): RenderState {
     panelFocus: "chat",
     chatFocus: "prompt",
     sidebar: createSidebarState(),
-    vim: createVimState(),
+    vim: { ...createVimState(), enabled: true },
   };
 }

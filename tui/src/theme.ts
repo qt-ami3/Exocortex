@@ -31,6 +31,10 @@ export interface Theme {
   prompt: string;      // Input prompt ❯
   tool: string;        // Tool call labels
 
+  // Vim mode indicators
+  vimNormal: string;      // Normal mode label
+  vimInsert: string;      // Insert mode label
+
   // Background colors
   topbarBg: string;       // Top bar
   userBg: string;         // User message bubble
