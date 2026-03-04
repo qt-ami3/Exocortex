@@ -196,12 +196,11 @@ function clampCursorNormal(state: RenderState): void {
 
 // ── Scroll dispatch ────────────────────────────────────────────────
 
-/** Route scroll to the focused scrollable — history or sidebar. */
+/** Route scroll to the focused scrollable. */
 function handleScroll(state: RenderState, scrollFn: (state: RenderState) => void): void {
   if (state.panelFocus === "sidebar") {
-    // Sidebar scroll = move selection by the appropriate amount
-    // For now, reuse the history scroll — sidebar items map 1:1 to lines
-    scrollFn(state);
+    // TODO: scroll sidebar selection when needed
+    scrollFn(state); // falls through to chat history for now
   } else {
     scrollFn(state);
   }
