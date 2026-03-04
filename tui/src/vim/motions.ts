@@ -91,6 +91,51 @@ export function wordEnd(buffer: string, pos: number): number {
   return i;
 }
 
+// ── WORD motions (whitespace-delimited) ────────────────────────────
+
+/** W — move to start of next WORD. */
+export function wordForwardBig(buffer: string, pos: number): number {
+  const len = buffer.length;
+  let i = pos;
+
+  // Skip current non-whitespace
+  while (i < len && !isSpace(buffer[i])) i++;
+
+  // Skip whitespace
+  while (i < len && isSpace(buffer[i])) i++;
+
+  return i;
+}
+
+/** B — move to start of previous WORD. */
+export function wordBackwardBig(buffer: string, pos: number): number {
+  if (pos <= 0) return 0;
+  let i = pos - 1;
+
+  // Skip whitespace backwards
+  while (i > 0 && isSpace(buffer[i])) i--;
+
+  // Skip non-whitespace backwards
+  while (i > 0 && !isSpace(buffer[i - 1])) i--;
+
+  return Math.max(0, i);
+}
+
+/** E — move to end of current/next WORD. */
+export function wordEndBig(buffer: string, pos: number): number {
+  const len = buffer.length;
+  if (pos >= len - 1) return Math.max(0, len - 1);
+  let i = pos + 1;
+
+  // Skip whitespace
+  while (i < len && isSpace(buffer[i])) i++;
+
+  // Skip non-whitespace
+  while (i < len - 1 && !isSpace(buffer[i + 1])) i++;
+
+  return i;
+}
+
 // ── Line motions ───────────────────────────────────────────────────
 
 /** 0 — move to start of current line. */
@@ -153,9 +198,12 @@ export function resolveMotion(name: string): ((buffer: string, pos: number) => n
   switch (name) {
     case "char_left":     return charLeft;
     case "char_right":    return charRight;
-    case "word_forward":  return wordForward;
-    case "word_backward": return wordBackward;
-    case "word_end":      return wordEnd;
+    case "word_forward":      return wordForward;
+    case "word_backward":     return wordBackward;
+    case "word_end":          return wordEnd;
+    case "word_forward_big":  return wordForwardBig;
+    case "word_backward_big": return wordBackwardBig;
+    case "word_end_big":      return wordEndBig;
     case "line_start":    return lineStart;
     case "line_end":      return lineEnd;
     case "line_down":     return lineDown;
