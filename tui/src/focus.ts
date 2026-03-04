@@ -73,6 +73,11 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
 
   // ── Abort (only when vim doesn't consume Esc) ──────────────────
   if (action === "abort") {
+    // Escape clears pending delete in sidebar before aborting
+    if (state.panelFocus === "sidebar" && state.sidebar.pendingDeleteId) {
+      state.sidebar.pendingDeleteId = null;
+      return { type: "handled" };
+    }
     return { type: "abort" };
   }
 
