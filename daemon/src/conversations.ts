@@ -40,6 +40,15 @@ export function get(id: string): Conversation | undefined {
   return conversations.get(id);
 }
 
+export function remove(id: string): boolean {
+  const existed = conversations.delete(id);
+  if (existed) {
+    dirty.delete(id);
+    activeJobs.delete(id);
+    persistence.deleteFile(id);
+  }
+  return existed;
+}
 
 export function setModel(id: string, model: ModelId): boolean {
   const conv = conversations.get(id);

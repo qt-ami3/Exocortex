@@ -69,6 +69,12 @@ export interface SetModelCommand {
   model: ModelId;
 }
 
+export interface DeleteConversationCommand {
+  type: "delete_conversation";
+  reqId?: string;
+  convId: string;
+}
+
 export type Command =
   | PingCommand
   | NewConversationCommand
@@ -78,7 +84,8 @@ export type Command =
   | SubscribeCommand
   | UnsubscribeCommand
   | ListConversationsCommand
-  | LoadConversationCommand;
+  | LoadConversationCommand
+  | DeleteConversationCommand;
 
 // ── Events (daemon → client) ────────────────────────────────────────
 
@@ -199,6 +206,11 @@ export interface ConversationUpdatedEvent {
   summary: ConversationSummary;
 }
 
+export interface ConversationDeletedEvent {
+  type: "conversation_deleted";
+  convId: string;
+}
+
 export interface ErrorEvent {
   type: "error";
   reqId?: string;
@@ -224,4 +236,5 @@ export type Event =
   | ConversationsListEvent
   | ConversationLoadedEvent
   | ConversationUpdatedEvent
+  | ConversationDeletedEvent
   | ErrorEvent;

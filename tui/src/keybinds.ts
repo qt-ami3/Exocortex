@@ -36,7 +36,8 @@ export type Action =
   // Navigation (sidebar, history scroll)
   | "nav_up"
   | "nav_down"
-  | "nav_select";
+  | "nav_select"
+  | "delete";
 
 // ── Keybind map ─────────────────────────────────────────────────────
 
@@ -79,6 +80,8 @@ const NAV_BINDS: Record<string, Action> = {
   "char:K":     "nav_up",
   "char:i":     "focus_prompt",
   "char:a":     "focus_prompt",
+  "char:d":     "delete",
+  "char:D":     "delete",
 };
 
 // ── Context ─────────────────────────────────────────────────────────

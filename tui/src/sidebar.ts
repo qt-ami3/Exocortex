@@ -22,6 +22,7 @@ export interface SidebarState {
   selectedId: string | null;
   selectedIndex: number;
   scrollOffset: number;
+  pendingDeleteId: string | null;
 }
 
 export function createSidebarState(): SidebarState {
@@ -31,6 +32,7 @@ export function createSidebarState(): SidebarState {
     selectedId: null,
     selectedIndex: 0,
     scrollOffset: 0,
+    pendingDeleteId: null,
   };
 }
 
@@ -39,10 +41,16 @@ export function createSidebarState(): SidebarState {
 export type SidebarKeyResult =
   | { type: "handled" }
   | { type: "select"; convId: string }
+  | { type: "delete_conversation"; convId: string }
   | { type: "unhandled" };
 
 export function handleSidebarKey(key: KeyEvent, sidebar: SidebarState): SidebarKeyResult {
   const action = resolveAction(key, "navigation");
+
+  // Any key that isn't "delete" clears the pending delete
+  if (action !== "delete") {
+    sidebar.pendingDeleteId = null;
+  }
 
   switch (action) {
     case "nav_down":
@@ -62,8 +70,25 @@ export function handleSidebarKey(key: KeyEvent, sidebar: SidebarState): SidebarK
       }
       return { type: "handled" };
 
+    case "delete": {
+      if (sidebar.conversations.length === 0) return { type: "handled" };
+      const selectedConv = sidebar.conversations[sidebar.selectedIndex];
+      if (!selectedConv) return { type: "handled" };
+
+      if (sidebar.pendingDeleteId === selectedConv.id) {
+        // Second d — confirm deletion
+        sidebar.pendingDeleteId = null;
+        sidebar.conversations.splice(sidebar.selectedIndex, 1);
+        syncSelectedIndex(sidebar);
+        return { type: "delete_conversation", convId: selectedConv.id };
+      }
+
+      // First d — mark for deletion
+      sidebar.pendingDeleteId = selectedConv.id;
+      return { type: "handled" };
+    }
+
     case "focus_prompt":
-      // i/a — let parent handle focus switch
       return { type: "unhandled" };
 
     default:
@@ -98,7 +123,7 @@ export function updateConversation(sidebar: SidebarState, summary: ConversationS
 }
 
 /** Resolve selectedId → selectedIndex after list changes. */
-function syncSelectedIndex(sidebar: SidebarState): void {
+export function syncSelectedIndex(sidebar: SidebarState): void {
   if (sidebar.selectedId) {
     const idx = sidebar.conversations.findIndex(c => c.id === sidebar.selectedId);
     if (idx !== -1) {
@@ -175,6 +200,7 @@ export function renderSidebar(
     const conv = convs[ci];
     const isSelected = ci === sidebar.selectedIndex;
     const isCurrent = conv.id === currentConvId;
+    const isPendingDelete = conv.id === sidebar.pendingDeleteId;
 
     // Build entry
     const prefix = isSelected ? "▸ " : "  ";
@@ -186,8 +212,8 @@ export function renderSidebar(
     if (title.length > maxTitle) title = title.slice(0, maxTitle - 1) + "…";
 
     const bg = isSelected ? theme.sidebarSelBg : theme.sidebarBg;
-    const fg = (isSelected || isCurrent) ? theme.text : theme.muted;
-    const titleText = isCurrent ? theme.bold + title + theme.boldOff : title;
+    const fg = isPendingDelete ? theme.error : (isSelected || isCurrent) ? theme.text : theme.muted;
+    const titleText = isCurrent && !isPendingDelete ? theme.bold + title + theme.boldOff : title;
     const plainLen = prefix.length + title.length;
     const padding = Math.max(0, innerWidth - plainLen);
 

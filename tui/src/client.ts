@@ -110,6 +110,10 @@ export class DaemonClient {
     this.send({ type: "set_model", convId, model });
   }
 
+  deleteConversation(convId: string): void {
+    this.send({ type: "delete_conversation", convId });
+  }
+
   listConversations(): void {
     this.send({ type: "list_conversations" });
   }

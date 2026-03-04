@@ -101,6 +101,17 @@ export function createHandler(server: DaemonServer) {
         break;
       }
 
+      case "delete_conversation": {
+        const ok = convStore.remove(cmd.convId);
+        if (ok) {
+          log("info", `handler: deleted conversation ${cmd.convId}`);
+          server.broadcast({ type: "conversation_deleted", convId: cmd.convId });
+        } else {
+          server.sendTo(client, { type: "error", reqId: cmd.reqId, convId: cmd.convId, message: `Conversation ${cmd.convId} not found` });
+        }
+        break;
+      }
+
       case "load_conversation": {
         const data = convStore.getDisplayData(cmd.convId);
         if (!data) {

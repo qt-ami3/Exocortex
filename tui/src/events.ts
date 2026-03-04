@@ -8,7 +8,7 @@
 import type { RenderState } from "./state";
 import { isStreaming } from "./state";
 import { createPendingAI, ensureCurrentBlock } from "./messages";
-import { updateConversationList, updateConversation } from "./sidebar";
+import { updateConversationList, updateConversation, syncSelectedIndex } from "./sidebar";
 import { theme } from "./theme";
 import type { Event } from "./protocol";
 import type { AIMessage } from "./messages";
@@ -186,6 +186,23 @@ export function handleEvent(
 
     case "conversation_updated": {
       updateConversation(state.sidebar, event.summary);
+      break;
+    }
+
+    case "conversation_deleted": {
+      // Remove from sidebar (in case another client deleted it)
+      const idx = state.sidebar.conversations.findIndex(c => c.id === event.convId);
+      if (idx !== -1) {
+        state.sidebar.conversations.splice(idx, 1);
+        syncSelectedIndex(state.sidebar);
+      }
+      // If this was the current conversation, clear the chat
+      if (state.convId === event.convId) {
+        state.convId = null;
+        state.messages = [];
+        state.pendingAI = null;
+        state.contextTokens = null;
+      }
       break;
     }
 

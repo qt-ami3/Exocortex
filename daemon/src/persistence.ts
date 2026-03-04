@@ -9,7 +9,7 @@
 
 import { homedir } from "os";
 import { join } from "path";
-import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "fs";
 import { log } from "./log";
 import type { Conversation, StoredMessage, ApiMessage, ModelId, ConversationSummary } from "./messages";
 
@@ -138,6 +138,16 @@ export function save(conv: Conversation): void {
   ensureDir();
   const file = toFile(conv);
   writeFileSync(convPath(conv.id), JSON.stringify(file, null, 2), { mode: 0o600 });
+}
+
+/** Delete a conversation file from disk. */
+export function deleteFile(id: string): void {
+  const path = convPath(id);
+  try {
+    if (existsSync(path)) unlinkSync(path);
+  } catch (err) {
+    log("error", `persistence: failed to delete ${id}: ${err}`);
+  }
 }
 
 /** Load a single conversation from disk. Returns null if not found or corrupt. */

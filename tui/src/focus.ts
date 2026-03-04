@@ -24,7 +24,8 @@ export type KeyResult =
   | { type: "submit" }
   | { type: "quit" }
   | { type: "abort" }
-  | { type: "load_conversation"; convId: string };
+  | { type: "load_conversation"; convId: string }
+  | { type: "delete_conversation"; convId: string };
 
 // ── Key routing ─────────────────────────────────────────────────────
 
@@ -65,6 +66,8 @@ function handleSidebarFocused(key: KeyEvent, state: RenderState): KeyResult {
       return { type: "handled" };
     case "select":
       return { type: "load_conversation", convId: result.convId };
+    case "delete_conversation":
+      return { type: "delete_conversation", convId: result.convId };
     case "unhandled":
       // focus_prompt comes back as unhandled from sidebar (i/a)
       state.panelFocus = "chat";
