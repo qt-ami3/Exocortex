@@ -67,7 +67,7 @@ export function render(state: RenderState): void {
 
   // ── Input line wrapping ────────────────────────────────────────
   const vimEnabled = state.vim.enabled;
-  const promptLen = vimEnabled ? 5 : 3;   // " N > " vs " > "
+  const promptLen = vimEnabled ? 4 : 3;   // "N > " vs " > "
   const maxInputWidth = chatW - promptLen;
   const maxInputRows = Math.min(10, Math.floor((rows - 6) / 2));
 
