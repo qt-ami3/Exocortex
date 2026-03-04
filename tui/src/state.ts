@@ -14,6 +14,12 @@ import { createSidebarState } from "./sidebar";
 import type { VimState } from "./vim";
 import { createVimState } from "./vim";
 
+/** Cached layout values — set by the renderer, read by scroll functions. */
+export interface LayoutCache {
+  totalLines: number;      // total rendered message lines
+  messageAreaHeight: number; // visible rows for messages
+}
+
 export interface RenderState {
   messages: Message[];
   /** The AI message currently being streamed (not yet finalized). */
@@ -37,6 +43,8 @@ export interface RenderState {
   sidebar: SidebarState;
   /** Vim keybind engine state. */
   vim: VimState;
+  /** Cached layout values — updated each render, read by scroll functions. */
+  layout: LayoutCache;
 }
 
 /** Streaming state is derived from pendingAI — no separate boolean. */
@@ -61,5 +69,6 @@ export function createInitialState(): RenderState {
     chatFocus: "prompt",
     sidebar: createSidebarState(),
     vim: { ...createVimState(), enabled: true },
+    layout: { totalLines: 0, messageAreaHeight: 0 },
   };
 }

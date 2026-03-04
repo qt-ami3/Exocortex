@@ -89,8 +89,7 @@ function handleHistoryFocused(key: KeyEvent, state: RenderState): ChatKeyResult 
 // ── Scroll helpers ──────────────────────────────────────────────────
 
 function maxScroll(state: RenderState): number {
-  const allLines = state.messages.length * 3;
-  return Math.max(0, allLines - (state.rows - 5));
+  return Math.max(0, state.layout.totalLines - state.layout.messageAreaHeight);
 }
 
 export function scrollBy(state: RenderState, lines: number): void {

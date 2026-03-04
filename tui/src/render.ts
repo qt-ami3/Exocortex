@@ -94,6 +94,10 @@ export function render(state: RenderState): void {
   const allLines = buildMessageLines(state, chatW);
   const totalLines = allLines.length;
 
+  // Cache layout for scroll functions
+  state.layout.totalLines = totalLines;
+  state.layout.messageAreaHeight = messageAreaHeight;
+
   let viewStart: number;
   if (state.scrollOffset === 0) {
     viewStart = Math.max(0, totalLines - messageAreaHeight);
