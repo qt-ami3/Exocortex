@@ -37,7 +37,14 @@ export type Action =
   | "nav_up"
   | "nav_down"
   | "nav_select"
-  | "delete";
+  | "delete"
+  // Scrolling
+  | "scroll_line_up"
+  | "scroll_line_down"
+  | "scroll_half_up"
+  | "scroll_half_down"
+  | "scroll_page_up"
+  | "scroll_page_down";
 
 // ── Keybind map ─────────────────────────────────────────────────────
 
@@ -45,7 +52,6 @@ export type Action =
 const BINDS: Record<string, Action> = {
   // Global
   "ctrl-c":     "quit",
-  "ctrl-d":     "quit",
   "escape":     "abort",
   "ctrl-m":     "sidebar_toggle",
   "ctrl-j":     "focus_cycle",
@@ -53,6 +59,14 @@ const BINDS: Record<string, Action> = {
 
   // Chat focus switching
   "ctrl-n":     "focus_history",
+
+  // Scrolling
+  "ctrl-y":     "scroll_line_up",
+  "ctrl-e":     "scroll_line_down",
+  "ctrl-u":     "scroll_half_up",
+  "ctrl-d":     "scroll_half_down",
+  "ctrl-b":     "scroll_page_up",
+  "ctrl-f":     "scroll_page_down",
 
   // Prompt editing
   "enter":      "submit",

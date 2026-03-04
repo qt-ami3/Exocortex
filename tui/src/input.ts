@@ -8,7 +8,10 @@ export interface KeyEvent {
   type: "char" | "enter" | "backspace" | "delete"
       | "left" | "right" | "home" | "end"
       | "up" | "down"
-      | "ctrl-c" | "ctrl-d" | "ctrl-j" | "ctrl-k" | "ctrl-l" | "ctrl-m" | "ctrl-n" | "escape"
+      | "ctrl-b" | "ctrl-c" | "ctrl-d" | "ctrl-e" | "ctrl-f"
+      | "ctrl-j" | "ctrl-k" | "ctrl-l" | "ctrl-m" | "ctrl-n"
+      | "ctrl-u" | "ctrl-y"
+      | "escape"
       | "unknown";
   char?: string;
 }
@@ -22,16 +25,17 @@ export function parseKeys(data: Buffer): KeyEvent[] {
     const ch = str[i];
     const code = str.charCodeAt(i);
 
-    // Ctrl+C
-    if (code === 3) { events.push({ type: "ctrl-c" }); i++; continue; }
-    // Ctrl+D
-    if (code === 4) { events.push({ type: "ctrl-d" }); i++; continue; }
-    // Ctrl+K (focus cycle)
+    // Ctrl keys (byte order)
+    if (code === 2)  { events.push({ type: "ctrl-b" }); i++; continue; }
+    if (code === 3)  { events.push({ type: "ctrl-c" }); i++; continue; }
+    if (code === 4)  { events.push({ type: "ctrl-d" }); i++; continue; }
+    if (code === 5)  { events.push({ type: "ctrl-e" }); i++; continue; }
+    if (code === 6)  { events.push({ type: "ctrl-f" }); i++; continue; }
     if (code === 11) { events.push({ type: "ctrl-k" }); i++; continue; }
-    // Ctrl+L (newline in input)
     if (code === 12) { events.push({ type: "ctrl-l" }); i++; continue; }
-    // Ctrl+N (focus switch)
     if (code === 14) { events.push({ type: "ctrl-n" }); i++; continue; }
+    if (code === 21) { events.push({ type: "ctrl-u" }); i++; continue; }
+    if (code === 25) { events.push({ type: "ctrl-y" }); i++; continue; }
     // Ctrl+J (LF) — distinct from Enter
     if (code === 10) { events.push({ type: "ctrl-j" }); i++; continue; }
     // Enter (CR)

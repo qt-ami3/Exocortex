@@ -88,12 +88,31 @@ function handleHistoryFocused(key: KeyEvent, state: RenderState): ChatKeyResult 
 
 // ── Scroll helpers ──────────────────────────────────────────────────
 
-export function scrollUp(state: RenderState): void {
+function maxScroll(state: RenderState): number {
   const allLines = state.messages.length * 3;
-  const maxScroll = Math.max(0, allLines - (state.rows - 5));
-  state.scrollOffset = Math.min(state.scrollOffset + 3, maxScroll);
+  return Math.max(0, allLines - (state.rows - 5));
 }
 
-export function scrollDown(state: RenderState): void {
-  state.scrollOffset = Math.max(0, state.scrollOffset - 3);
+export function scrollBy(state: RenderState, lines: number): void {
+  state.scrollOffset = Math.max(0, Math.min(state.scrollOffset + lines, maxScroll(state)));
+}
+
+export function scrollUp(state: RenderState): void { scrollBy(state, 3); }
+export function scrollDown(state: RenderState): void { scrollBy(state, -3); }
+
+export function scrollLineUp(state: RenderState): void { scrollBy(state, 1); }
+export function scrollLineDown(state: RenderState): void { scrollBy(state, -1); }
+
+export function scrollHalfUp(state: RenderState): void {
+  scrollBy(state, Math.floor(state.rows / 2));
+}
+export function scrollHalfDown(state: RenderState): void {
+  scrollBy(state, -Math.floor(state.rows / 2));
+}
+
+export function scrollPageUp(state: RenderState): void {
+  scrollBy(state, state.rows);
+}
+export function scrollPageDown(state: RenderState): void {
+  scrollBy(state, -state.rows);
 }

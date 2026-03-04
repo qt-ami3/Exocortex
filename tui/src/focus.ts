@@ -13,7 +13,13 @@
 import type { KeyEvent } from "./input";
 import type { RenderState } from "./state";
 import { resolveAction } from "./keybinds";
-import { handleChatKey, scrollUp, scrollDown } from "./chat";
+import {
+  handleChatKey,
+  scrollUp, scrollDown,
+  scrollLineUp, scrollLineDown,
+  scrollHalfUp, scrollHalfDown,
+  scrollPageUp, scrollPageDown,
+} from "./chat";
 import { handleSidebarKey, handleSidebarAction } from "./sidebar";
 import { processKey, type VimContext } from "./vim";
 
@@ -47,6 +53,12 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
         state.panelFocus = state.panelFocus === "sidebar" ? "chat" : "sidebar";
       }
       return { type: "handled" };
+    case "scroll_line_up":   handleScroll(state, scrollLineUp);   return { type: "handled" };
+    case "scroll_line_down": handleScroll(state, scrollLineDown); return { type: "handled" };
+    case "scroll_half_up":   handleScroll(state, scrollHalfUp);   return { type: "handled" };
+    case "scroll_half_down": handleScroll(state, scrollHalfDown); return { type: "handled" };
+    case "scroll_page_up":   handleScroll(state, scrollPageUp);   return { type: "handled" };
+    case "scroll_page_down": handleScroll(state, scrollPageDown); return { type: "handled" };
   }
 
   // ── Vim processing ─────────────────────────────────────────────
@@ -179,6 +191,19 @@ function clampCursorNormal(state: RenderState): void {
     state.cursorPos = Math.min(state.cursorPos, state.inputBuffer.length - 1);
   } else {
     state.cursorPos = 0;
+  }
+}
+
+// ── Scroll dispatch ────────────────────────────────────────────────
+
+/** Route scroll to the focused scrollable — history or sidebar. */
+function handleScroll(state: RenderState, scrollFn: (state: RenderState) => void): void {
+  if (state.panelFocus === "sidebar") {
+    // Sidebar scroll = move selection by the appropriate amount
+    // For now, reuse the history scroll — sidebar items map 1:1 to lines
+    scrollFn(state);
+  } else {
+    scrollFn(state);
   }
 }
 
