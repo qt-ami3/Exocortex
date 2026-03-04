@@ -19,6 +19,7 @@ import {
   scrollLineUp, scrollLineDown,
   scrollHalfUp, scrollHalfDown,
   scrollPageUp, scrollPageDown,
+  scrollToTop, scrollToBottom,
 } from "./chat";
 import { handleSidebarKey, handleSidebarAction, moveSelection } from "./sidebar";
 import { processKey, type VimContext } from "./vim";
@@ -74,6 +75,8 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
     case "scroll_half_down": handleScroll(state, scrollHalfDown); return { type: "handled" };
     case "scroll_page_up":   handleScroll(state, scrollPageUp);   return { type: "handled" };
     case "scroll_page_down": handleScroll(state, scrollPageDown); return { type: "handled" };
+    case "scroll_top":       handleScroll(state, scrollToTop);    return { type: "handled" };
+    case "scroll_bottom":    handleScroll(state, scrollToBottom); return { type: "handled" };
   }
 
   // ── Sidebar pending delete cancel (before vim) ──────────────────

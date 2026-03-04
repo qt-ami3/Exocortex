@@ -62,8 +62,8 @@ const KEYMAP: KeymapEntry[] = [
 
   { mode: "normal", context: "history", key: "j",  command: { type: "action", action: "nav_down" } },
   { mode: "normal", context: "history", key: "k",  command: { type: "action", action: "nav_up" } },
-  { mode: "normal", context: "history", key: "gg", command: { type: "action", action: "nav_up" } },  // TODO: scroll_top
-  { mode: "normal", context: "history", key: "G",  command: { type: "action", action: "nav_down" } },  // TODO: scroll_bottom
+  { mode: "normal", context: "history", key: "gg", command: { type: "action", action: "scroll_top" } },
+  { mode: "normal", context: "history", key: "G",  command: { type: "action", action: "scroll_bottom" } },
   { mode: "normal", context: "history", key: "i",  command: { type: "mode_change", mode: "insert" } },
   { mode: "normal", context: "history", key: "a",  command: { type: "mode_change", mode: "insert" } },
 
@@ -71,8 +71,8 @@ const KEYMAP: KeymapEntry[] = [
 
   { mode: "normal", context: "sidebar", key: "j",  command: { type: "action", action: "nav_down" } },
   { mode: "normal", context: "sidebar", key: "k",  command: { type: "action", action: "nav_up" } },
-  { mode: "normal", context: "sidebar", key: "gg", command: { type: "action", action: "nav_up" } },  // TODO: scroll_top
-  { mode: "normal", context: "sidebar", key: "G",  command: { type: "action", action: "nav_down" } },  // TODO: scroll_bottom
+  { mode: "normal", context: "sidebar", key: "gg", command: { type: "action", action: "scroll_top" } },
+  { mode: "normal", context: "sidebar", key: "G",  command: { type: "action", action: "scroll_bottom" } },
   { mode: "normal", context: "sidebar", key: "d",  command: { type: "action", action: "delete" } },
   { mode: "normal", context: "sidebar", key: "i",  command: { type: "mode_change", mode: "insert" } },
   { mode: "normal", context: "sidebar", key: "a",  command: { type: "mode_change", mode: "insert" } },

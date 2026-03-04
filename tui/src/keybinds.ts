@@ -45,6 +45,8 @@ export type Action =
   | "scroll_half_down"
   | "scroll_page_up"
   | "scroll_page_down"
+  | "scroll_top"
+  | "scroll_bottom"
   // Conversation
   | "new_conversation"
   // Sidebar navigation (from any panel)

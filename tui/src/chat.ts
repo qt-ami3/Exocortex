@@ -115,3 +115,10 @@ export function scrollPageUp(state: RenderState): void {
 export function scrollPageDown(state: RenderState): void {
   scrollBy(state, -state.rows);
 }
+
+export function scrollToTop(state: RenderState): void {
+  state.scrollOffset = maxScroll(state);
+}
+export function scrollToBottom(state: RenderState): void {
+  state.scrollOffset = 0;
+}
