@@ -170,14 +170,20 @@ export async function orchestrateSendMessage(
       log("info", `orchestrator: stream interrupted for ${convId}`);
     }
 
-    // Save partial response if any content was received
-    const hasContent = partialContent.some(b =>
+    // Save partial response if any content was received.
+    // Strip thinking blocks with missing/incomplete signatures —
+    // the API rejects them on replay.
+    const safeContent = partialContent.filter(b => {
+      if (b.type === "thinking") return b.signature && b.signature.length > 0;
+      return true;
+    });
+    const hasContent = safeContent.some(b =>
       (b.type === "text" && b.text) || (b.type === "thinking" && b.thinking)
     );
     if (hasContent) {
       conv.messages.push({
         role: "assistant",
-        content: partialContent,
+        content: safeContent,
         metadata: {
           startedAt,
           endedAt: Date.now(),
