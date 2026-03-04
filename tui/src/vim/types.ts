@@ -23,6 +23,7 @@ export interface VimState {
   mode: VimMode;
   /** Pending operator waiting for a motion/textobject ("d", "c", "y"). */
   pendingOperator: string | null;
+  pendingOperatorKey: string | null;
   /** Accumulated multi-key prefix ("g" waiting for "g" → "gg"). */
   pendingKeys: string;
   /** Numeric prefix (e.g. 3 in "3w"). Null = 1. */
@@ -34,6 +35,7 @@ export function createVimState(): VimState {
     enabled: false,
     mode: "insert",
     pendingOperator: null,
+    pendingOperatorKey: null,
     pendingKeys: "",
     count: null,
   };
@@ -42,6 +44,7 @@ export function createVimState(): VimState {
 /** Reset all pending state (count, operator, keys). */
 export function resetPending(vim: VimState): void {
   vim.pendingOperator = null;
+  vim.pendingOperatorKey = null;
   vim.pendingKeys = "";
   vim.count = null;
 }

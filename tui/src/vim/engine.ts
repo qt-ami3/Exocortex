@@ -107,8 +107,8 @@ function handleNormalMode(
   const fullKey = vim.pendingKeys + ks;
 
   // ── Check keymap for doubled operator (dd, cc, yy) ─────────────
-  if (vim.pendingOperator && ks === vim.pendingOperator) {
-    const doubled = vim.pendingOperator + ks;
+  if (vim.pendingOperator && ks === vim.pendingOperatorKey) {
+    const doubled = vim.pendingOperatorKey + ks;
     const cmd = lookupCommand(vim.mode, context, doubled);
     if (cmd) {
       const result = executeCommand(cmd, vim, context, buffer, cursor);
@@ -134,7 +134,10 @@ function handleNormalMode(
   const cmd = lookupCommand(vim.mode, context, fullKey);
   if (cmd) {
     vim.pendingKeys = "";
-    return executeCommand(cmd, vim, context, buffer, cursor);
+    const result = executeCommand(cmd, vim, context, buffer, cursor);
+    // If this set a pending operator, record the raw key for doubled check (dd, cc, yy)
+    if (cmd.type === "operator") vim.pendingOperatorKey = ks;
+    return result;
   }
 
   // Maybe a prefix of a longer sequence (e.g. "g" → "gg")
@@ -172,6 +175,7 @@ function executeCommand(
 
     case "operator":
       vim.pendingOperator = cmd.name;
+      // pendingOperatorKey is set by the caller (handleNormalMode)
       vim.pendingKeys = "";
       // Don't reset count — it carries to the motion (3dw)
       vim.count = null;
