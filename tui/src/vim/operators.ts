@@ -10,11 +10,12 @@ import { lineStartOf, lineEndOf, clampNormal } from "./buffer";
 
 // ── Core: delete a range ───────────────────────────────────────────
 
-/** Delete [start, end) from the buffer. */
+/** Delete [start, end) from the buffer. Returns raw cursor at start —
+ *  caller clamps for normal mode, insert mode uses as-is. */
 export function deleteRange(buffer: string, start: number, end: number): BufferEdit {
   if (start > end) [start, end] = [end, start];
   const newBuffer = buffer.slice(0, start) + buffer.slice(end);
-  return { buffer: newBuffer, cursor: clampNormal(newBuffer, start) };
+  return { buffer: newBuffer, cursor: Math.min(start, newBuffer.length) };
 }
 
 // ── Line operators ─────────────────────────────────────────────────
@@ -58,16 +59,20 @@ export function deleteCharBefore(buffer: string, pos: number): BufferEdit {
 
 // ── To-end-of-line operators ───────────────────────────────────────
 
-/** D — delete from cursor to end of line. */
+/** D — delete from cursor to end of line. Stays in normal mode. */
 export function deleteToEnd(buffer: string, pos: number): BufferEdit {
   const le = lineEndOf(buffer, pos);
   if (pos >= le) return { buffer, cursor: clampNormal(buffer, Math.max(0, pos - 1)) };
-  return deleteRange(buffer, pos, le);
+  const edit = deleteRange(buffer, pos, le);
+  edit.cursor = clampNormal(edit.buffer, edit.cursor);
+  return edit;
 }
 
-/** C — same as D, but caller switches to insert mode. */
+/** C — delete from cursor to end of line. Caller switches to insert mode. */
 export function changeToEnd(buffer: string, pos: number): BufferEdit {
-  return deleteToEnd(buffer, pos);
+  const le = lineEndOf(buffer, pos);
+  if (pos >= le) return { buffer, cursor: pos };
+  return deleteRange(buffer, pos, le);
 }
 
 // ── Open line ──────────────────────────────────────────────────────
