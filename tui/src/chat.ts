@@ -10,7 +10,6 @@ import type { KeyEvent } from "./input";
 import type { RenderState } from "./state";
 import { resolveAction } from "./keybinds";
 import { handlePromptKey } from "./promptline";
-import { placeAtBottom } from "./historycursor";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -35,15 +34,6 @@ export function handleChatKey(key: KeyEvent, state: RenderState): ChatKeyResult 
 
 function handlePromptFocused(key: KeyEvent, state: RenderState): ChatKeyResult {
   const action = resolveAction(key);
-
-  // Ctrl+N toggles: prompt → history
-  if (action === "focus_history") {
-    state.chatFocus = "history";
-    state.vim.mode = "normal";
-    // Place cursor at bottom of visible content
-    state.historyCursor = placeAtBottom(state.historyLines);
-    return { type: "handled" };
-  }
 
   // Delegate to promptline
   const result = handlePromptKey(state, key);
@@ -70,8 +60,7 @@ function handleHistoryFocused(key: KeyEvent, state: RenderState): ChatKeyResult 
 
   switch (action) {
     case "focus_prompt":
-    case "focus_history":
-      // i/a → prompt, Ctrl+N toggles back to prompt
+      // i/a → prompt
       state.chatFocus = "prompt";
       state.vim.mode = "insert";
       return { type: "handled" };

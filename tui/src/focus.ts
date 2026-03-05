@@ -26,7 +26,7 @@ import { handleSidebarKey, handleSidebarAction, moveSelection } from "./sidebar"
 import { processKey, copyToClipboard, pasteFromClipboard, type VimContext } from "./vim";
 import { clampNormal } from "./vim/buffer";
 import {
-  applyHistoryAction, stripAnsi, ensureCursorVisible,
+  applyHistoryAction, stripAnsi, ensureCursorVisible, placeAtBottom,
   scrollHalfPageWithCursor, scrollFullPageWithCursor, scrollLineWithStickyCursor,
 } from "./historycursor";
 
@@ -63,6 +63,18 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
       return { type: "handled" };
     case "new_conversation":
       return { type: "new_conversation" };
+    case "focus_history":
+      // Toggle: if already in history → back to prompt, otherwise → history
+      if (state.panelFocus === "chat" && state.chatFocus === "history") {
+        state.chatFocus = "prompt";
+        state.vim.mode = "insert";
+      } else {
+        state.panelFocus = "chat";
+        state.chatFocus = "history";
+        state.vim.mode = "normal";
+        state.historyCursor = placeAtBottom(state.historyLines);
+      }
+      return { type: "handled" };
     case "sidebar_next":
     case "sidebar_prev": {
       // Don't intercept when typing in the prompt — these are regular chars
