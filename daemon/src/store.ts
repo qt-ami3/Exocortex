@@ -39,7 +39,8 @@ export interface StoredAuth {
 
 // ── Paths ───────────────────────────────────────────────────────────
 
-const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "exocortex");
+/** Base config directory for exocortex (~/.config/exocortex). */
+export const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "exocortex");
 const CRED_FILE = join(CONFIG_DIR, "credentials.json");
 
 // Mnemo fallback

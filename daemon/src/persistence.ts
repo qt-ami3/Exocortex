@@ -7,10 +7,10 @@
  * This is the only file that touches the conversations directory.
  */
 
-import { homedir } from "os";
 import { join } from "path";
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "fs";
 import { log } from "./log";
+import { CONFIG_DIR } from "./store";
 import type { Conversation, StoredMessage, ApiMessage, ModelId, ConversationSummary } from "./messages";
 
 // ── Schema version ──────────────────────────────────────────────────
@@ -94,7 +94,6 @@ function migrate(data: Record<string, unknown>): ConversationFile {
 
 // ── Paths ───────────────────────────────────────────────────────────
 
-const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "exocortex");
 const CONV_DIR = join(CONFIG_DIR, "conversations");
 
 function ensureDir(): void {

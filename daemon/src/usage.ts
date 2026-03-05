@@ -7,15 +7,38 @@
  * — this file has no IPC or server knowledge.
  */
 
+import { join } from "path";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { log } from "./log";
-import { loadAuth } from "./store";
+import { loadAuth, CONFIG_DIR } from "./store";
 import type { UsageData, UsageWindow } from "./messages";
+
+// ── Persistence ───────────────────────────────────────────────────
+
+const USAGE_FILE = join(CONFIG_DIR, "usage.json");
+
+function loadFromDisk(): UsageData | null {
+  try {
+    if (!existsSync(USAGE_FILE)) return null;
+    return JSON.parse(readFileSync(USAGE_FILE, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+function saveToDisk(usage: UsageData): void {
+  try {
+    writeFileSync(USAGE_FILE, JSON.stringify(usage));
+  } catch {
+    // best-effort
+  }
+}
 
 // ── Cached state ───────────────────────────────────────────────────
 
-let lastUsage: UsageData | null = null;
+let lastUsage: UsageData | null = loadFromDisk();
 
-/** Return the last known usage data (may be null before first fetch). */
+/** Return the last known usage data (loaded from disk on startup). */
 export function getLastUsage(): UsageData | null {
   return lastUsage;
 }
@@ -38,6 +61,7 @@ export function refreshUsage(onUpdate: (usage: UsageData) => void): void {
   fetchUsage(auth.tokens.accessToken).then((usage) => {
     if (usage) {
       lastUsage = usage;
+      saveToDisk(usage);
       onUpdate(usage);
     } else {
       log("warn", "usage: fetch returned null");
@@ -80,6 +104,7 @@ export function handleUsageHeaders(headers: Headers, onUpdate: (usage: UsageData
   const usage = parseHeaders(headers);
   if (usage) {
     lastUsage = usage;
+    saveToDisk(usage);
     onUpdate(usage);
   }
 }

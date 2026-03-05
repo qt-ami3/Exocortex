@@ -9,12 +9,11 @@
  *   bun run src/main.ts login    Authenticate with Anthropic
  */
 
-import { homedir } from "os";
 import { join } from "path";
 import { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync } from "fs";
 import { connect as netConnect } from "net";
 import { log } from "./log";
-import { loadAuth, isTokenExpired } from "./store";
+import { loadAuth, isTokenExpired, CONFIG_DIR } from "./store";
 import { DaemonServer } from "./server";
 import { createHandler } from "./handler";
 import { handleLogin } from "./cli";
@@ -23,8 +22,7 @@ import * as convStore from "./conversations";
 // ── Paths ───────────────────────────────────────────────────────────
 
 function runtimeDir(): string {
-  const xdg = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
-  const dir = join(xdg, "exocortex", "runtime");
+  const dir = join(CONFIG_DIR, "runtime");
   mkdirSync(dir, { recursive: true });
   return dir;
 }
