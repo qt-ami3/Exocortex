@@ -76,6 +76,11 @@ async function fetchUsage(accessToken: string): Promise<UsageData | null> {
         Authorization: `Bearer ${accessToken}`,
         "anthropic-beta": "oauth-2025-04-20",
         "Content-Type": "application/json",
+        // NOTE: Uses "exocortex" not "claude-code" here. The usage endpoint
+        // rate-limits per User-Agent + token. Sharing claude-code's agent
+        // string with Mnemo exhausts the shared bucket → permanent 429.
+        // The Messages API must keep claude-code (see api.ts) but this
+        // endpoint is just a data query — separate agent = separate bucket.
         "User-Agent": "exocortex/0.1.0",
       },
       signal: AbortSignal.timeout(5000),
