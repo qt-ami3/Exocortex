@@ -46,7 +46,6 @@ export function handleEvent(
 
     case "streaming_started": {
       if (event.convId !== state.convId) break;
-      state.scrollOffset = 0;
       break;
     }
 
@@ -64,7 +63,6 @@ export function handleEvent(
         const block = ensureCurrentBlock(state.pendingAI, "text");
         if (block.type === "text") block.text += event.text;
       }
-      state.scrollOffset = 0;
       break;
     }
 
