@@ -261,7 +261,7 @@ export function render(state: RenderState): void {
       : `  ${promptStyle}${promptGlyph}${theme.reset} `;
 
     let lineContent = inputLines[i];
-    if (promptInVisual && lineContent.length > 0) {
+    if (promptInVisual) {
       // Apply selection highlight to prompt input line
       const selStart = Math.min(state.vim.visualAnchor, state.cursorPos);
       const selEnd = Math.max(state.vim.visualAnchor, state.cursorPos);
