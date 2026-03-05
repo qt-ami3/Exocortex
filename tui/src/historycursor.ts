@@ -266,3 +266,113 @@ export function clampCursor(cursor: HistoryCursor, lines: string[]): HistoryCurs
   const maxCol = Math.max(0, stripAnsi(lines[row]).length - 1);
   return { row, col: Math.min(cursor.col, maxCol) };
 }
+
+// ── Dispatch ───────────────────────────────────────────────────────
+
+import type { Action } from "./keybinds";
+import type { RenderState } from "./state";
+
+/**
+ * Apply a history cursor action to state.
+ * Returns true if the action was handled.
+ */
+export function applyHistoryAction(action: Action, state: RenderState): boolean {
+  const lines = state.historyLines;
+  const cur = state.historyCursor;
+
+  if (lines.length === 0) return true;
+
+  const lineLen = stripAnsi(lines[cur.row] ?? "").length;
+
+  switch (action) {
+    case "history_left":    state.historyCursor = charLeft(cur); break;
+    case "history_right":   state.historyCursor = charRight(cur, lineLen); break;
+    case "history_up":      state.historyCursor = lineUp(cur, lines); break;
+    case "history_down":    state.historyCursor = lineDown(cur, lines); break;
+    case "history_w":       state.historyCursor = wordForward(cur, lines); break;
+    case "history_b":       state.historyCursor = wordBackward(cur, lines); break;
+    case "history_e":       state.historyCursor = wordEnd(cur, lines); break;
+    case "history_W":       state.historyCursor = wordForwardBig(cur, lines); break;
+    case "history_B":       state.historyCursor = wordBackwardBig(cur, lines); break;
+    case "history_E":       state.historyCursor = wordEndBig(cur, lines); break;
+    case "history_0":       state.historyCursor = lineStart(cur); break;
+    case "history_dollar":  state.historyCursor = lineEnd(cur, lineLen); break;
+    case "history_gg":      state.historyCursor = bufferStart(); break;
+    case "history_G":       state.historyCursor = bufferEnd(lines); break;
+    case "history_yy":      return true; // caller handles clipboard
+    default:                return false;
+  }
+
+  ensureCursorVisible(state);
+  return true;
+}
+
+/** Adjust scrollOffset so the cursor row is within the visible message area. */
+export function ensureCursorVisible(state: RenderState): void {
+  const { totalLines, messageAreaHeight } = state.layout;
+  if (totalLines <= messageAreaHeight) {
+    state.scrollOffset = 0;
+    return;
+  }
+
+  const cursorRow = state.historyCursor.row;
+  const viewStart = totalLines - messageAreaHeight - state.scrollOffset;
+  const viewEnd = viewStart + messageAreaHeight;
+
+  if (cursorRow < viewStart) {
+    state.scrollOffset = totalLines - messageAreaHeight - cursorRow;
+  } else if (cursorRow >= viewEnd) {
+    state.scrollOffset = totalLines - messageAreaHeight - (cursorRow - messageAreaHeight + 1);
+  }
+
+  const maxScroll = Math.max(0, totalLines - messageAreaHeight);
+  state.scrollOffset = Math.max(0, Math.min(state.scrollOffset, maxScroll));
+}
+
+// ── Rendering ──────────────────────────────────────────────────────
+
+const REVERSE = "\x1b[7m";
+const NO_REVERSE = "\x1b[27m";
+
+/**
+ * Render a line with a reverse-video block cursor at the given
+ * visible column position. Walks through the ANSI string,
+ * counting only visible characters to find the right spot.
+ */
+export function renderLineWithCursor(line: string, col: number): string {
+  const plain = stripAnsi(line);
+  if (plain.length === 0) {
+    return `${REVERSE} ${NO_REVERSE}`;
+  }
+
+  const parts: string[] = [];
+  let visIdx = 0;
+  let i = 0;
+  let cursorRendered = false;
+
+  while (i < line.length) {
+    if (line[i] === "\x1b") {
+      const match = line.slice(i).match(/^\x1b(?:\[[0-9;]*[A-Za-z]|\]8;[^;]*;[^\x1b]*\x1b\\)/);
+      if (match) {
+        parts.push(match[0]);
+        i += match[0].length;
+        continue;
+      }
+    }
+
+    if (visIdx === col) {
+      parts.push(`${REVERSE}${line[i]}${NO_REVERSE}`);
+      cursorRendered = true;
+    } else {
+      parts.push(line[i]);
+    }
+    visIdx++;
+    i++;
+  }
+
+  if (!cursorRendered) {
+    parts.push(`${REVERSE} ${NO_REVERSE}`);
+  }
+
+  return parts.join("");
+}
