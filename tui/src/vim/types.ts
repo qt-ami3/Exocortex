@@ -9,7 +9,7 @@ import type { Action } from "../keybinds";
 
 // ── Mode ───────────────────────────────────────────────────────────
 
-export type VimMode = "normal" | "insert" | "visual";
+export type VimMode = "normal" | "insert" | "visual" | "visual-line";
 
 // ── Context ────────────────────────────────────────────────────────
 
@@ -29,6 +29,8 @@ export interface VimState {
   pendingKeys: string;
   /** Numeric prefix (e.g. 3 in "3w"). Null = 1. */
   count: number | null;
+  /** Anchor position for visual mode selection. */
+  visualAnchor: number;
 }
 
 export function createVimState(): VimState {
@@ -39,6 +41,7 @@ export function createVimState(): VimState {
     pendingTextObjectModifier: null,
     pendingKeys: "",
     count: null,
+    visualAnchor: 0,
   };
 }
 
@@ -70,6 +73,8 @@ export type VimResult =
   | { type: "yank"; text: string }
   /** Paste requested — caller reads clipboard, inserts at position. */
   | { type: "paste"; position: "after" | "before" }
+  /** Visual selection deleted/changed in prompt. */
+  | { type: "visual_edit"; buffer: string; cursor: number; mode: VimMode }
   /** Engine consumed the key but needs more input (e.g. "d" waiting for motion). */
   | { type: "pending" }
   /** Engine doesn't handle this key — fall through to existing system. */

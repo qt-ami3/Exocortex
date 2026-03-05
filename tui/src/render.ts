@@ -14,8 +14,8 @@ import { buildMessageLines } from "./conversation";
 import { getInputLines } from "./promptline";
 import { show_cursor, hide_cursor, cursor_block, cursor_underline, cursor_bar, applyLineBg } from "./terminal";
 import { theme } from "./theme";
-import { clampCursor } from "./historycursor";
-import { renderLineWithCursor } from "./cursorrender";
+import { clampCursor, stripAnsi, contentBounds } from "./historycursor";
+import { renderLineWithCursor, renderLineWithSelection } from "./cursorrender";
 
 // ── ANSI positioning (non-color escapes) ────────────────────────────
 
@@ -24,6 +24,46 @@ const clear_line = `${ESC}2K`;
 const move_to = (row: number, col: number) => `${ESC}${row};${col}H`;
 
 // ── Main render ─────────────────────────────────────────────────────
+
+/**
+ * Apply visual selection highlighting to a prompt input line.
+ * Maps buffer-level selection range to columns within a wrapped line.
+ */
+function highlightPromptLine(
+  line: string,
+  wrappedLineIdx: number,
+  selStart: number,
+  selEnd: number,
+  buffer: string,
+  maxWidth: number,
+  isLinewise: boolean,
+): string {
+  // Compute the buffer offset for this wrapped line
+  const bufferLines = buffer.split("\n");
+  let offset = 0;
+  let wrappedIdx = 0;
+
+  for (const bLine of bufferLines) {
+    const chunks = bLine.length <= maxWidth ? 1 : Math.ceil(bLine.length / maxWidth);
+    if (wrappedLineIdx < wrappedIdx + chunks) {
+      // This wrapped line is within this buffer line
+      const chunkIdx = wrappedLineIdx - wrappedIdx;
+      const lineStart = offset + chunkIdx * maxWidth;
+      const lineEnd = lineStart + line.length - 1;
+
+      if (isLinewise || (selStart <= lineEnd && selEnd >= lineStart)) {
+        const colStart = isLinewise ? 0 : Math.max(0, selStart - lineStart);
+        const colEnd = isLinewise ? line.length - 1 : Math.min(line.length - 1, selEnd - lineStart);
+        return renderLineWithSelection(line, colStart, colEnd);
+      }
+      return line;
+    }
+    wrappedIdx += chunks;
+    offset += bLine.length + 1;
+  }
+
+  return line;
+}
 
 export function render(state: RenderState): void {
   const { cols, rows } = state;
@@ -117,6 +157,14 @@ export function render(state: RenderState): void {
     viewStart = Math.max(0, totalLines - messageAreaHeight - state.scrollOffset);
   }
 
+  // Compute visual selection range if in visual mode
+  const inVisual = historyFocused
+    && (state.vim.mode === "visual" || state.vim.mode === "visual-line");
+  const vAnchor = state.historyVisualAnchor;
+  const vCursor = state.historyCursor;
+  const vStartRow = inVisual ? Math.min(vAnchor.row, vCursor.row) : -1;
+  const vEndRow = inVisual ? Math.max(vAnchor.row, vCursor.row) : -1;
+
   for (let i = 0; i < messageAreaHeight; i++) {
     const row = messageAreaStart + i;
     out.push(move_to(row, 1) + clear_line);
@@ -128,11 +176,50 @@ export function render(state: RenderState): void {
     out.push(move_to(row, chatCol));
     const lineIdx = viewStart + i;
     if (lineIdx < totalLines) {
-      if (historyFocused && lineIdx === state.historyCursor.row) {
-        const withCursor = renderLineWithCursor(allLines[lineIdx], state.historyCursor.col);
+      const line = allLines[lineIdx];
+
+      if (inVisual && lineIdx >= vStartRow && lineIdx <= vEndRow) {
+        // This line is part of the visual selection
+        let rendered: string;
+        if (state.vim.mode === "visual-line") {
+          // Full line highlight
+          rendered = renderLineWithSelection(line, -1, -1);
+        } else {
+          // Character selection — compute column range for this row
+          let startCol: number;
+          let endCol: number;
+          if (vStartRow === vEndRow) {
+            startCol = Math.min(vAnchor.col, vCursor.col);
+            endCol = Math.max(vAnchor.col, vCursor.col);
+          } else if (lineIdx === vStartRow) {
+            const anchorIsStart = vAnchor.row <= vCursor.row;
+            startCol = anchorIsStart ? vAnchor.col : vCursor.col;
+            const plain = stripAnsi(line);
+            const bounds = contentBounds(plain);
+            endCol = bounds.end;
+          } else if (lineIdx === vEndRow) {
+            const anchorIsStart = vAnchor.row <= vCursor.row;
+            const plain = stripAnsi(line);
+            const bounds = contentBounds(plain);
+            startCol = bounds.start;
+            endCol = anchorIsStart ? vCursor.col : vAnchor.col;
+          } else {
+            // Middle lines: full content
+            startCol = -1;
+            endCol = -1;
+          }
+          rendered = renderLineWithSelection(line, startCol, endCol);
+        }
+        // Cursor overlay on cursor row
+        if (lineIdx === state.historyCursor.row) {
+          rendered = renderLineWithCursor(rendered, state.historyCursor.col);
+        }
+        out.push(applyLineBg(rendered, theme.selectionBg));
+      } else if (historyFocused && lineIdx === state.historyCursor.row) {
+        const withCursor = renderLineWithCursor(line, state.historyCursor.col);
         out.push(applyLineBg(withCursor, theme.historyLineBg));
       } else {
-        out.push(allLines[lineIdx]);
+        out.push(line);
       }
     }
   }
@@ -145,23 +232,39 @@ export function render(state: RenderState): void {
   out.push(move_to(sepAbove, chatCol) + `${promptColor}${"─".repeat(chatW)}${theme.reset}`);
 
   // ── Input rows ────────────────────────────────────────────────
+  const promptInVisual = promptFocused
+    && (state.vim.mode === "visual" || state.vim.mode === "visual-line");
+
   for (let i = 0; i < inputRowCount; i++) {
     const row = firstInputRow + i;
     const promptGlyph = (i === 0 && !isNewLine[i]) ? ">" : "+";
     const promptStyle = promptFocused ? theme.accent : theme.dim;
 
     const isFirst = i === 0 && !isNewLine[i];
-    const modeChar = state.vim.mode === "normal" ? "N" : "I";
-    const modeColor = state.vim.mode === "normal" ? theme.vimNormal : theme.vimInsert;
+    const modeChar = state.vim.mode === "visual" ? "V"
+      : state.vim.mode === "visual-line" ? "VL"
+      : state.vim.mode === "normal" ? "N" : "I";
+    const modeColor = (state.vim.mode === "visual" || state.vim.mode === "visual-line")
+      ? theme.vimVisual
+      : state.vim.mode === "normal" ? theme.vimNormal : theme.vimInsert;
     const prompt = isFirst
       ? `${modeColor}${modeChar}${theme.reset} ${promptStyle}${promptGlyph}${theme.reset} `
       : `  ${promptStyle}${promptGlyph}${theme.reset} `;
+
+    let lineContent = inputLines[i];
+    if (promptInVisual && lineContent.length > 0) {
+      // Apply selection highlight to prompt input line
+      const selStart = Math.min(state.vim.visualAnchor, state.cursorPos);
+      const selEnd = Math.max(state.vim.visualAnchor, state.cursorPos);
+      lineContent = highlightPromptLine(lineContent, i, selStart, selEnd,
+        state.inputBuffer, maxInputWidth, state.vim.mode === "visual-line");
+    }
 
     out.push(move_to(row, 1) + clear_line);
     if (sidebarOpen && sbRows[row - 1]) {
       out.push(sbRows[row - 1]);
     }
-    out.push(move_to(row, chatCol) + prompt + inputLines[i]);
+    out.push(move_to(row, chatCol) + prompt + lineContent);
   }
 
   // ── Separator below input ─────────────────────────────────────

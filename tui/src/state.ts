@@ -57,6 +57,8 @@ export interface RenderState {
   showToolOutput: boolean;
   /** Cursor position in chat history (active when chatFocus === "history"). */
   historyCursor: HistoryCursor;
+  /** Visual mode anchor in chat history (row, col). Set when entering visual. */
+  historyVisualAnchor: HistoryCursor;
   /** Cached rendered lines for history cursor navigation (ANSI included). */
   historyLines: string[];
 }
@@ -89,6 +91,7 @@ export function createInitialState(): RenderState {
     toolRegistry: [],
     showToolOutput: false,
     historyCursor: createHistoryCursor(),
+    historyVisualAnchor: createHistoryCursor(),
     historyLines: [],
   };
 }

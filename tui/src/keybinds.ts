@@ -69,7 +69,8 @@ export type Action =
   | "history_dollar"
   | "history_gg"
   | "history_G"
-  | "history_yy";
+  | "history_yy"
+  | "history_visual_yank";
 
 // ── Keybind map ─────────────────────────────────────────────────────
 

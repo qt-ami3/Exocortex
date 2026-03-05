@@ -1,13 +1,13 @@
 /**
- * ANSI cursor overlay rendering.
+ * ANSI cursor & selection overlay rendering.
  *
- * Paints a block cursor onto an ANSI-styled string at a given
- * visible column. Preserves surrounding text styles (bold, fg
- * color, etc) through the cursor reset.
+ * Paints a block cursor or selection highlight onto ANSI-styled
+ * strings. Preserves surrounding text styles (bold, fg color, etc)
+ * through resets.
  *
- * Separated from historycursor.ts (navigation) because this is
- * pure ANSI string surgery — no knowledge of motions, scrolling,
- * or state. Will grow with visual mode (range highlighting).
+ * Two functions:
+ * - renderLineWithCursor: single character block cursor
+ * - renderLineWithSelection: highlight a column range
  */
 
 import { theme } from "./theme";
@@ -69,6 +69,73 @@ export function renderLineWithCursor(line: string, col: number): string {
   if (!cursorRendered) {
     parts.push(`${CURSOR_FG}${theme.cursorBg} ${theme.reset}`);
   }
+
+  return parts.join("");
+}
+
+/**
+ * Highlight a range of visible columns with the selection background.
+ * Preserves existing text styles. If startCol/endCol are -1, the
+ * entire line is highlighted (visual-line mode).
+ *
+ * @param startCol - First visible column to highlight (inclusive). -1 = entire line.
+ * @param endCol   - Last visible column to highlight (inclusive). -1 = entire line.
+ */
+export function renderLineWithSelection(
+  line: string,
+  startCol: number,
+  endCol: number,
+): string {
+  const plain = stripAnsi(line);
+  if (plain.length === 0) return line;
+
+  const fullLine = startCol === -1;
+
+  const parts: string[] = [];
+  let visIdx = 0;
+  let i = 0;
+  let activeEscapes: string[] = [];
+  let inSelection = fullLine;
+
+  if (fullLine) parts.push(theme.selectionBg);
+
+  while (i < line.length) {
+    if (line[i] === "\x1b") {
+      const match = line.slice(i).match(/^\x1b(?:\[[0-9;]*[A-Za-z]|\]8;[^;]*;[^\x1b]*\x1b\\)/);
+      if (match) {
+        const esc = match[0];
+        if (esc === theme.reset || esc === "\x1b[0m") {
+          activeEscapes = [];
+          // Re-apply selection bg after reset
+          parts.push(esc);
+          if (inSelection) parts.push(theme.selectionBg);
+        } else {
+          activeEscapes.push(esc);
+          parts.push(esc);
+        }
+        i += esc.length;
+        continue;
+      }
+    }
+
+    if (!fullLine && visIdx === startCol) {
+      inSelection = true;
+      parts.push(theme.selectionBg);
+    }
+
+    parts.push(line[i]);
+
+    if (!fullLine && visIdx === endCol) {
+      inSelection = false;
+      parts.push(`${theme.reset}${activeEscapes.join("")}`);
+    }
+
+    visIdx++;
+    i++;
+  }
+
+  // Close selection if it extends to end of line
+  if (inSelection) parts.push(theme.reset);
 
   return parts.join("");
 }

@@ -45,6 +45,11 @@ export function processKey(
     return handleInsertMode(key, vim, buffer, cursor);
   }
 
+  // ── Visual / Visual-line mode ──────────────────────────────────
+  if (vim.mode === "visual" || vim.mode === "visual-line") {
+    return handleVisualMode(key, vim, context, buffer, cursor);
+  }
+
   // ── Normal mode ────────────────────────────────────────────────
   return handleNormalMode(key, vim, context, buffer, cursor);
 }
@@ -65,6 +70,148 @@ function handleInsertMode(key: KeyEvent, vim: VimState, buffer: string, cursor: 
   }
   // Everything else passes through to promptline / existing system
   return { type: "passthrough" };
+}
+
+// ── Visual mode handling ──────────────────────────────────────────
+
+function handleVisualMode(
+  key: KeyEvent,
+  vim: VimState,
+  context: VimContext,
+  buffer: string,
+  cursor: number,
+): VimResult {
+  const ks = keyString(key);
+
+  // Escape → exit visual, return to normal
+  if (ks === "escape" || ks === null && key.type === "escape") {
+    vim.mode = "normal";
+    resetPending(vim);
+    return { type: "mode_change", mode: "normal", cursor };
+  }
+
+  // v in visual → exit to normal (toggle off)
+  if (ks === "v" && vim.mode === "visual") {
+    vim.mode = "normal";
+    resetPending(vim);
+    return { type: "mode_change", mode: "normal", cursor };
+  }
+
+  // V in visual-line → exit to normal (toggle off)
+  if (ks === "V" && vim.mode === "visual-line") {
+    vim.mode = "normal";
+    resetPending(vim);
+    return { type: "mode_change", mode: "normal", cursor };
+  }
+
+  // v ↔ V: switch between visual and visual-line
+  if (ks === "V" && vim.mode === "visual") {
+    vim.mode = "visual-line";
+    return { type: "mode_change", mode: "visual-line", cursor };
+  }
+  if (ks === "v" && vim.mode === "visual-line") {
+    vim.mode = "visual";
+    return { type: "mode_change", mode: "visual", cursor };
+  }
+
+  if (ks === null) return { type: "passthrough" };
+
+  // Multi-key sequence support (gg in visual)
+  const fullKey = vim.pendingKeys + ks;
+
+  const cmd = lookupCommand(vim.mode, context, fullKey);
+  if (cmd) {
+    vim.pendingKeys = "";
+    return executeVisualCommand(cmd, vim, context, buffer, cursor);
+  }
+
+  if (isPrefix(vim.mode, context, fullKey)) {
+    vim.pendingKeys = fullKey;
+    return { type: "pending" };
+  }
+
+  resetPending(vim);
+  return { type: "noop" };
+}
+
+/** Execute a command in visual mode. Motions extend selection, standalones act on it. */
+function executeVisualCommand(
+  cmd: VimCommand,
+  vim: VimState,
+  context: VimContext,
+  buffer: string,
+  cursor: number,
+): VimResult {
+  switch (cmd.type) {
+    case "motion": {
+      // Motion extends selection by moving cursor (anchor stays)
+      const motionFn = resolveMotion(cmd.name);
+      if (!motionFn) return { type: "noop" };
+      const newPos = motionFn(buffer, cursor);
+      return { type: "cursor_move", cursor: newPos };
+    }
+
+    case "action":
+      // History motions — dispatch to focus.ts, anchor stays
+      return { type: "action", action: cmd.action };
+
+    case "standalone": {
+      const anchor = vim.visualAnchor;
+      let start = Math.min(anchor, cursor);
+      let end = Math.max(anchor, cursor);
+
+      // Visual-line: expand to full lines
+      if (vim.mode === "visual-line") {
+        start = lineStartOf(buffer, start);
+        end = lineEndOf(buffer, end);
+        // Include trailing newline
+        if (end < buffer.length) end++;
+      } else {
+        // Character visual: inclusive (end + 1 for slice)
+        end = Math.min(end + 1, buffer.length);
+      }
+
+      const text = buffer.slice(start, end);
+
+      switch (cmd.name) {
+        case "visual_yank":
+          vim.mode = "normal";
+          resetPending(vim);
+          return { type: "yank", text };
+
+        case "visual_delete": {
+          if (context !== "prompt") {
+            vim.mode = "normal";
+            resetPending(vim);
+            return { type: "noop" };
+          }
+          const newBuf = buffer.slice(0, start) + buffer.slice(end);
+          const newCursor = clampNormal(newBuf, start);
+          vim.mode = "normal";
+          resetPending(vim);
+          return { type: "visual_edit", buffer: newBuf, cursor: newCursor, mode: "normal" };
+        }
+
+        case "visual_change": {
+          if (context !== "prompt") {
+            vim.mode = "normal";
+            resetPending(vim);
+            return { type: "noop" };
+          }
+          const newBuf = buffer.slice(0, start) + buffer.slice(end);
+          vim.mode = "insert";
+          resetPending(vim);
+          return { type: "visual_edit", buffer: newBuf, cursor: start, mode: "insert" };
+        }
+
+        default:
+          return { type: "noop" };
+      }
+    }
+
+    default:
+      return { type: "noop" };
+  }
 }
 
 // ── Normal mode handling ───────────────────────────────────────────
@@ -319,6 +466,12 @@ function executeModeChange(
 ): VimResult {
   vim.mode = cmd.mode;
   resetPending(vim);
+
+  // Set visual anchor when entering visual mode
+  if (cmd.mode === "visual" || cmd.mode === "visual-line") {
+    vim.visualAnchor = cursor;
+    return { type: "mode_change", mode: cmd.mode, cursor };
+  }
 
   let newCursor = cursor;
   if (context === "prompt") {

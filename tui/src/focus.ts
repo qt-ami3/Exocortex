@@ -168,12 +168,27 @@ function processVimKey(key: KeyEvent, state: RenderState): KeyResult | null {
       handlePaste(result.position, state);
       return { type: "handled" };
 
+    case "visual_edit":
+      state.inputBuffer = result.buffer;
+      state.cursorPos = result.cursor;
+      state.vim.mode = result.mode;
+      return { type: "handled" };
+
     case "mode_change":
       state.vim.mode = result.mode;
       if (result.cursor !== undefined) state.cursorPos = result.cursor;
+      // Set visual anchor for history when entering visual mode
+      if ((result.mode === "visual" || result.mode === "visual-line")
+          && state.chatFocus === "history") {
+        state.historyVisualAnchor = { ...state.historyCursor };
+      }
       // If switching to insert from sidebar/history, also focus prompt
       if (result.mode === "insert" && state.chatFocus !== "prompt") {
         state.chatFocus = "prompt";
+      }
+      // Exiting visual → normal, clear history selection
+      if (result.mode === "normal") {
+        // no-op needed, just mode change — renderer checks vim.mode
       }
       return { type: "handled" };
 
@@ -184,7 +199,7 @@ function processVimKey(key: KeyEvent, state: RenderState): KeyResult | null {
 
 /** Handle an action produced by the vim engine. */
 function handleVimAction(action: string, state: RenderState): KeyResult {
-  // History cursor actions
+  // History cursor actions (including visual yank)
   if ((action as Action).startsWith("history_")) {
     return handleHistoryCursorAction(action as Action, state);
   }
@@ -237,8 +252,60 @@ function handleHistoryCursorAction(action: Action, state: RenderState): KeyResul
     return { type: "handled" };
   }
 
+  if (action === "history_visual_yank") {
+    const text = getHistoryVisualSelection(state);
+    if (text) copyToClipboard(text);
+    state.vim.mode = "normal";
+    ensureCursorVisible(state);
+    return { type: "handled" };
+  }
+
   applyHistoryAction(action, state);
   return { type: "handled" };
+}
+
+// ── History visual selection ──────────────────────────────────────
+
+/** Extract the selected text from history in visual/visual-line mode. */
+function getHistoryVisualSelection(state: RenderState): string {
+  const anchor = state.historyVisualAnchor;
+  const cursor = state.historyCursor;
+  const lines = state.historyLines;
+
+  const startRow = Math.min(anchor.row, cursor.row);
+  const endRow = Math.max(anchor.row, cursor.row);
+
+  if (state.vim.mode === "visual-line") {
+    // Full lines
+    const selectedLines: string[] = [];
+    for (let r = startRow; r <= endRow; r++) {
+      selectedLines.push(stripAnsi(lines[r] ?? "").trimEnd());
+    }
+    return selectedLines.join("\n");
+  }
+
+  // Character visual
+  if (startRow === endRow) {
+    const plain = stripAnsi(lines[startRow] ?? "");
+    const startCol = Math.min(anchor.col, cursor.col);
+    const endCol = Math.max(anchor.col, cursor.col);
+    return plain.slice(startCol, endCol + 1);
+  }
+
+  // Multi-line character selection
+  const result: string[] = [];
+  const firstPlain = stripAnsi(lines[startRow] ?? "");
+  const lastPlain = stripAnsi(lines[endRow] ?? "");
+  const firstCol = startRow === anchor.row ? anchor.col : cursor.col;
+  const lastCol = endRow === anchor.row ? anchor.col : cursor.col;
+
+  result.push(firstPlain.slice(firstCol));
+  for (let r = startRow + 1; r < endRow; r++) {
+    result.push(stripAnsi(lines[r] ?? "").trimEnd());
+  }
+  result.push(lastPlain.slice(0, lastCol + 1));
+
+  return result.join("\n");
 }
 
 /** Handle j/k vim actions in sidebar or history context. */

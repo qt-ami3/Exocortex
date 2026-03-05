@@ -33,6 +33,7 @@ export const whale: Theme = {
   // Vim mode indicators
   vimNormal: `${ESC}38;2;72;202;228m`,    // #48cae4
   vimInsert: `${ESC}38;2;46;196;182m`,    // #2ec4b6
+  vimVisual: `${ESC}38;2;199;146;234m`,   // #c792ea (purple)
 
   // Background colors
   topbarBg:      `${ESC}48;2;29;155;240m`,    // accent (#1d9bf0) as background
@@ -41,6 +42,7 @@ export const whale: Theme = {
   sidebarSelBg:  `${ESC}48;2;15;25;60m`,      // #0f193c
   cursorBg:      `${ESC}48;2;72;202;228m`,    // #48cae4 (matches vimNormal)
   historyLineBg: `${ESC}48;2;9;13;53m`,     // #090d35 (matches userBg)
+  selectionBg:   `${ESC}48;2;79;82;88m`,    // #4f5258
 
   // Border colors
   borderFocused:   `${ESC}38;2;28;148;229m`,  // #1c94e5

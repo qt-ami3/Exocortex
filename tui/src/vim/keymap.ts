@@ -94,6 +94,65 @@ const KEYMAP: KeymapEntry[] = [
   { mode: "normal", context: "sidebar", key: "i",  command: { type: "mode_change", mode: "insert" } },
   { mode: "normal", context: "sidebar", key: "a",  command: { type: "mode_change", mode: "insert" } },
 
+  // ── Visual mode: enter from normal ─────────────────────────────
+  { mode: "normal", context: "prompt",  key: "v",  command: { type: "mode_change", mode: "visual" } },
+  { mode: "normal", context: "prompt",  key: "V",  command: { type: "mode_change", mode: "visual-line" } },
+  { mode: "normal", context: "history", key: "v",  command: { type: "mode_change", mode: "visual" } },
+  { mode: "normal", context: "history", key: "V",  command: { type: "mode_change", mode: "visual-line" } },
+
+  // ── Visual mode: prompt (motions + operators) ───────────────────
+  { mode: "visual", context: "prompt", key: "h",  command: { type: "motion", name: "char_left" } },
+  { mode: "visual", context: "prompt", key: "l",  command: { type: "motion", name: "char_right" } },
+  { mode: "visual", context: "prompt", key: "j",  command: { type: "motion", name: "line_down" } },
+  { mode: "visual", context: "prompt", key: "k",  command: { type: "motion", name: "line_up" } },
+  { mode: "visual", context: "prompt", key: "w",  command: { type: "motion", name: "word_forward" } },
+  { mode: "visual", context: "prompt", key: "b",  command: { type: "motion", name: "word_backward" } },
+  { mode: "visual", context: "prompt", key: "e",  command: { type: "motion", name: "word_end" } },
+  { mode: "visual", context: "prompt", key: "W",  command: { type: "motion", name: "word_forward_big" } },
+  { mode: "visual", context: "prompt", key: "B",  command: { type: "motion", name: "word_backward_big" } },
+  { mode: "visual", context: "prompt", key: "E",  command: { type: "motion", name: "word_end_big" } },
+  { mode: "visual", context: "prompt", key: "0",  command: { type: "motion", name: "line_start" } },
+  { mode: "visual", context: "prompt", key: "$",  command: { type: "motion", name: "line_end" } },
+  { mode: "visual", context: "prompt", key: "gg", command: { type: "motion", name: "buffer_start" } },
+  { mode: "visual", context: "prompt", key: "G",  command: { type: "motion", name: "buffer_end" } },
+  { mode: "visual", context: "prompt", key: "d",  command: { type: "standalone", name: "visual_delete" } },
+  { mode: "visual", context: "prompt", key: "x",  command: { type: "standalone", name: "visual_delete" } },
+  { mode: "visual", context: "prompt", key: "c",  command: { type: "standalone", name: "visual_change" } },
+  { mode: "visual", context: "prompt", key: "y",  command: { type: "standalone", name: "visual_yank" } },
+
+  // ── Visual mode: history (motions + yank only) ──────────────────
+  { mode: "visual", context: "history", key: "h",  command: { type: "action", action: "history_left" } },
+  { mode: "visual", context: "history", key: "l",  command: { type: "action", action: "history_right" } },
+  { mode: "visual", context: "history", key: "j",  command: { type: "action", action: "history_down" } },
+  { mode: "visual", context: "history", key: "k",  command: { type: "action", action: "history_up" } },
+  { mode: "visual", context: "history", key: "w",  command: { type: "action", action: "history_w" } },
+  { mode: "visual", context: "history", key: "b",  command: { type: "action", action: "history_b" } },
+  { mode: "visual", context: "history", key: "e",  command: { type: "action", action: "history_e" } },
+  { mode: "visual", context: "history", key: "W",  command: { type: "action", action: "history_W" } },
+  { mode: "visual", context: "history", key: "B",  command: { type: "action", action: "history_B" } },
+  { mode: "visual", context: "history", key: "E",  command: { type: "action", action: "history_E" } },
+  { mode: "visual", context: "history", key: "0",  command: { type: "action", action: "history_0" } },
+  { mode: "visual", context: "history", key: "$",  command: { type: "action", action: "history_dollar" } },
+  { mode: "visual", context: "history", key: "gg", command: { type: "action", action: "history_gg" } },
+  { mode: "visual", context: "history", key: "G",  command: { type: "action", action: "history_G" } },
+  { mode: "visual", context: "history", key: "y",  command: { type: "action", action: "history_visual_yank" } },
+
+  // ── Visual-line mode: same as visual but for line selection ─────
+  { mode: "visual-line", context: "prompt", key: "j",  command: { type: "motion", name: "line_down" } },
+  { mode: "visual-line", context: "prompt", key: "k",  command: { type: "motion", name: "line_up" } },
+  { mode: "visual-line", context: "prompt", key: "gg", command: { type: "motion", name: "buffer_start" } },
+  { mode: "visual-line", context: "prompt", key: "G",  command: { type: "motion", name: "buffer_end" } },
+  { mode: "visual-line", context: "prompt", key: "d",  command: { type: "standalone", name: "visual_delete" } },
+  { mode: "visual-line", context: "prompt", key: "x",  command: { type: "standalone", name: "visual_delete" } },
+  { mode: "visual-line", context: "prompt", key: "c",  command: { type: "standalone", name: "visual_change" } },
+  { mode: "visual-line", context: "prompt", key: "y",  command: { type: "standalone", name: "visual_yank" } },
+
+  { mode: "visual-line", context: "history", key: "j",  command: { type: "action", action: "history_down" } },
+  { mode: "visual-line", context: "history", key: "k",  command: { type: "action", action: "history_up" } },
+  { mode: "visual-line", context: "history", key: "gg", command: { type: "action", action: "history_gg" } },
+  { mode: "visual-line", context: "history", key: "G",  command: { type: "action", action: "history_G" } },
+  { mode: "visual-line", context: "history", key: "y",  command: { type: "action", action: "history_visual_yank" } },
+
   // ── Insert mode: only Esc is captured ────────────────────────────
   // (everything else passes through to existing promptline.ts)
   // Esc is handled directly in the engine, not via keymap.

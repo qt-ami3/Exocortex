@@ -34,6 +34,7 @@ export interface Theme {
   // Vim mode indicators
   vimNormal: string;      // Normal mode label
   vimInsert: string;      // Insert mode label
+  vimVisual: string;      // Visual mode label
 
   // Background colors
   topbarBg: string;       // Top bar
@@ -42,6 +43,7 @@ export interface Theme {
   sidebarSelBg: string;   // Sidebar selected item
   cursorBg: string;       // Inline cursor (history, visual mode)
   historyLineBg: string;  // Selected line background in history
+  selectionBg: string;    // Visual mode selection highlight
 
   // Border colors
   borderFocused: string;  // Focused panel border
