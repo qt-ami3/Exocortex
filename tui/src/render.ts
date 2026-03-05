@@ -93,6 +93,13 @@ export function render(state: RenderState): void {
   const allLines = buildMessageLines(state, chatW);
   const totalLines = allLines.length;
 
+  // Pin scroll position: if user is scrolled up and content changes,
+  // adjust offset so the viewport stays on the same content.
+  const prevTotal = state.layout.totalLines;
+  if (state.scrollOffset > 0 && prevTotal > 0 && totalLines !== prevTotal) {
+    state.scrollOffset = Math.max(0, state.scrollOffset + (totalLines - prevTotal));
+  }
+
   // Cache layout for scroll functions
   state.layout.totalLines = totalLines;
   state.layout.messageAreaHeight = messageAreaHeight;
