@@ -71,27 +71,21 @@ function renderBlock(block: Block, contentWidth: number, toolRegistry: ToolDispl
       break;
     }
     case "tool_result": {
-      const COLLAPSED_LINES = 3;
+      if (!showToolOutput) break;
       const fg = block.isError ? theme.error : theme.dim;
       const symbol = block.isError ? "✗" : "↳";
       const firstPrefix = `  ${symbol} `;
       const contPrefix = "    ";
       const trimmed = block.output.replace(/\n+$/, "");
       const outputLines = trimmed.split("\n");
-      const maxLines = showToolOutput ? outputLines.length : COLLAPSED_LINES;
-      const visible = outputLines.slice(0, maxLines);
-      const remaining = outputLines.length - maxLines;
 
       let first = true;
-      for (const ol of visible) {
+      for (const ol of outputLines) {
         for (const wl of wordWrap(ol, contentWidth - contPrefix.length)) {
           const prefix = first ? firstPrefix : contPrefix;
           first = false;
           lines.push(`${fg}${prefix}${wl}${theme.reset}`);
         }
-      }
-      if (remaining > 0) {
-        lines.push(`${fg}${contPrefix}… (${remaining} more lines)${theme.reset}`);
       }
       break;
     }
