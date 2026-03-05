@@ -39,7 +39,7 @@ export function createHandler(server: DaemonServer) {
 
       case "new_conversation": {
         const id = convStore.generateId();
-        const model = cmd.model ?? "sonnet";
+        const model = cmd.model ?? "opus";
         convStore.create(id, model);
         log("info", `handler: created conversation ${id} (model=${model})`);
 

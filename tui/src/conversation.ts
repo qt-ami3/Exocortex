@@ -71,16 +71,16 @@ function renderBlock(block: Block, contentWidth: number, toolRegistry: ToolDispl
       break;
     }
     case "tool_result": {
-      if (!showToolOutput) break;
-      const maxLines = 20;
+      const COLLAPSED_LINES = 3;
       const fg = block.isError ? theme.error : theme.dim;
       const symbol = block.isError ? "✗" : "↳";
       const firstPrefix = `  ${symbol} `;
       const contPrefix = "    ";
       const trimmed = block.output.replace(/\n+$/, "");
       const outputLines = trimmed.split("\n");
-      const truncated = outputLines.length > maxLines;
+      const maxLines = showToolOutput ? outputLines.length : COLLAPSED_LINES;
       const visible = outputLines.slice(0, maxLines);
+      const remaining = outputLines.length - maxLines;
 
       let first = true;
       for (const ol of visible) {
@@ -90,8 +90,8 @@ function renderBlock(block: Block, contentWidth: number, toolRegistry: ToolDispl
           lines.push(`${fg}${prefix}${wl}${theme.reset}`);
         }
       }
-      if (truncated) {
-        lines.push(`${fg}${contPrefix}… (${outputLines.length - maxLines} more lines)${theme.reset}`);
+      if (remaining > 0) {
+        lines.push(`${fg}${contPrefix}… (${remaining} more lines)${theme.reset}`);
       }
       break;
     }

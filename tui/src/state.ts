@@ -64,7 +64,7 @@ export function createInitialState(): RenderState {
   return {
     messages: [],
     pendingAI: null,
-    model: "sonnet",
+    model: "opus",
     convId: null,
     inputBuffer: "",
     cursorPos: 0,
