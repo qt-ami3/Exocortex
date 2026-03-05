@@ -87,7 +87,8 @@ export function renderLineWithSelection(
   endCol: number,
 ): string {
   const plain = stripAnsi(line);
-  if (plain.length === 0) return line;
+  // Empty line in selection: show a single highlighted space (like neovim's virtual \n)
+  if (plain.length === 0) return `${theme.selectionBg} ${theme.reset}`;
 
   const fullLine = startCol === -1;
 
