@@ -128,7 +128,9 @@ export function render(state: RenderState): void {
     const lineIdx = viewStart + i;
     if (lineIdx < totalLines) {
       if (historyFocused && lineIdx === state.historyCursor.row) {
-        out.push(renderLineWithCursor(allLines[lineIdx], state.historyCursor.col));
+        // Selected line: background fill + cursor character
+        const rendered = renderLineWithCursor(allLines[lineIdx], state.historyCursor.col, theme.historyLineBg);
+        out.push(`${theme.historyLineBg}${rendered}${theme.reset}`);
       } else {
         out.push(allLines[lineIdx]);
       }

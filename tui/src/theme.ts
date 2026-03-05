@@ -41,6 +41,7 @@ export interface Theme {
   sidebarBg: string;      // Sidebar body
   sidebarSelBg: string;   // Sidebar selected item
   cursorBg: string;       // Inline cursor (history, visual mode)
+  historyLineBg: string;  // Selected line background in history
 
   // Border colors
   borderFocused: string;  // Focused panel border

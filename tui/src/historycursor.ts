@@ -349,8 +349,9 @@ function scrollWithCursor(state: RenderState, lines: number): void {
 }
 
 /**
- * Ctrl+E / Ctrl+Y — scroll viewport by 1 line, cursor stays on same
- * screen row (sticks). If cursor would go off-screen, clamp to edge.
+ * Ctrl+E / Ctrl+Y — scroll viewport by 1 line, cursor stays on
+ * same BUFFER LINE (sticks to the line). Only moves cursor if
+ * it would go off-screen (clamped to nearest visible edge).
  * `dir`: positive = up (Ctrl+Y), negative = down (Ctrl+E).
  */
 export function scrollLineWithStickyCursor(state: RenderState, dir: number): void {
@@ -359,30 +360,24 @@ export function scrollLineWithStickyCursor(state: RenderState, dir: number): voi
 
   const { messageAreaHeight } = state.layout;
   const maxOff = Math.max(0, totalLines - messageAreaHeight);
-  const oldOffset = state.scrollOffset;
 
-  // Move viewport
-  state.scrollOffset = Math.max(0, Math.min(oldOffset + dir, maxOff));
+  // Move viewport only
+  state.scrollOffset = Math.max(0, Math.min(state.scrollOffset + dir, maxOff));
 
-  const actualScroll = state.scrollOffset - oldOffset;
-  if (actualScroll === 0) {
-    // Viewport can't scroll further — move cursor alone (vim behavior)
-    const newRow = Math.max(0, Math.min(state.historyCursor.row - dir, totalLines - 1));
-    state.historyCursor = clampCursor({ row: newRow, col: state.historyCursor.col }, state.historyLines);
-    return;
-  }
-
-  // Cursor stays on same screen row → moves in buffer by scroll amount
-  const newRow = state.historyCursor.row - actualScroll;
+  // Cursor stays on same buffer row — only adjust if off-screen
   const viewStart = totalLines - messageAreaHeight - state.scrollOffset;
   const viewEnd = viewStart + messageAreaHeight - 1;
+  const curRow = state.historyCursor.row;
 
-  // Clamp to visible area
-  const clampedRow = Math.max(viewStart, Math.min(newRow, viewEnd));
-  state.historyCursor = clampCursor(
-    { row: clampedRow, col: state.historyCursor.col },
-    state.historyLines,
-  );
+  if (curRow < viewStart) {
+    state.historyCursor = clampCursor(
+      { row: viewStart, col: state.historyCursor.col }, state.historyLines,
+    );
+  } else if (curRow > viewEnd) {
+    state.historyCursor = clampCursor(
+      { row: viewEnd, col: state.historyCursor.col }, state.historyLines,
+    );
+  }
 }
 
 /** Adjust scrollOffset so the cursor row is within the visible message area. */
@@ -418,10 +413,13 @@ const CURSOR_FG = "\x1b[38;2;0;0;0m";  // black text on cursor
  * column position. Walks the ANSI string, counting only visible
  * characters to find the right spot.
  *
- * After the cursor character, re-emits the active ANSI state so
- * that styled text (bold, colors) continues correctly.
+ * After the cursor character, re-emits the line background + active
+ * ANSI state so styled text (bold, colors, bg) continues correctly.
+ *
+ * @param lineBg - Optional background escape for the entire line.
+ *                 Restored after cursor reset alongside text styles.
  */
-export function renderLineWithCursor(line: string, col: number): string {
+export function renderLineWithCursor(line: string, col: number, lineBg?: string): string {
   const plain = stripAnsi(line);
   if (plain.length === 0) {
     return `${CURSOR_FG}${theme.cursorBg} ${theme.reset}`;
@@ -433,6 +431,7 @@ export function renderLineWithCursor(line: string, col: number): string {
   let cursorRendered = false;
   // Track active ANSI escapes so we can restore after cursor reset
   let activeEscapes: string[] = [];
+  const bgRestore = lineBg ?? "";
 
   while (i < line.length) {
     if (line[i] === "\x1b") {
@@ -452,8 +451,8 @@ export function renderLineWithCursor(line: string, col: number): string {
     }
 
     if (visIdx === col) {
-      // Cursor: override fg/bg, then restore previous style after
-      parts.push(`${CURSOR_FG}${theme.cursorBg}${line[i]}${theme.reset}${activeEscapes.join("")}`);
+      // Cursor: override fg/bg, then restore line bg + text styles after
+      parts.push(`${CURSOR_FG}${theme.cursorBg}${line[i]}${theme.reset}${bgRestore}${activeEscapes.join("")}`);
       cursorRendered = true;
     } else {
       parts.push(line[i]);
