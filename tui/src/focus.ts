@@ -75,10 +75,12 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
     case "sidebar_toggle":
       state.sidebar.open = !state.sidebar.open;
       state.panelFocus = state.sidebar.open ? "sidebar" : "chat";
+      if (state.panelFocus === "sidebar") state.vim.mode = "normal";
       return { type: "handled" };
     case "focus_cycle":
       if (state.sidebar.open) {
         state.panelFocus = state.panelFocus === "sidebar" ? "chat" : "sidebar";
+        if (state.panelFocus === "sidebar") state.vim.mode = "normal";
       }
       return { type: "handled" };
     case "new_conversation":
@@ -103,6 +105,7 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
       if (isPromptTyping) break;
       if (!state.sidebar.open) state.sidebar.open = true;
       state.panelFocus = "sidebar";
+      state.vim.mode = "normal";
       moveSelection(state.sidebar, action === "sidebar_next" ? 1 : -1);
       return { type: "handled" };
     }
