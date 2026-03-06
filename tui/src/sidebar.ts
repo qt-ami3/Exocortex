@@ -109,8 +109,9 @@ export function handleSidebarAction(action: string, sidebar: SidebarState): Side
       if (sidebar.conversations.length === 0) return { type: "handled" };
       const conv = sidebar.conversations[sidebar.selectedIndex];
       if (!conv) return { type: "handled" };
-      // Optimistic toggle
+      // Optimistic toggle — unpin bumps updatedAt (matches daemon behavior)
       const newPinned = !conv.pinned;
+      if (!newPinned && conv.pinned) conv.updatedAt = Date.now();
       conv.pinned = newPinned;
       // Re-sort: pinned first, then by updatedAt desc
       sidebar.conversations.sort((a, b) => {
