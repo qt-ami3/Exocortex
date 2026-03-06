@@ -160,6 +160,7 @@ function processVimKey(key: KeyEvent, state: RenderState): KeyResult | null {
     if (historyFindHandler(key, state)) return { type: "handled" };
   }
 
+  const prevMode = state.vim.mode;
   const result = processKey(key, state.vim, context, state.inputBuffer, state.cursorPos);
 
   switch (result.type) {
@@ -234,7 +235,8 @@ function processVimKey(key: KeyEvent, state: RenderState): KeyResult | null {
 
     case "mode_change":
       // Commit insert session when leaving insert mode
-      if (state.vim.mode === "insert" && result.mode !== "insert") {
+      // (prevMode needed because engine mutates vim.mode before returning)
+      if (prevMode === "insert" && result.mode !== "insert") {
         commitInsertSession(state.undo, state.inputBuffer);
       }
       state.vim.mode = result.mode;
