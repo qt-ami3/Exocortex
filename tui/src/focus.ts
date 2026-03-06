@@ -53,6 +53,7 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
   if (key.type === "paste" && key.text) {
     // Normalize line endings: \r\n → \n, stray \r → \n
     const text = key.text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    pushUndo(state.undo, state.inputBuffer, state.cursorPos);
     const buf = state.inputBuffer;
     const pos = state.cursorPos;
     state.inputBuffer = buf.slice(0, pos) + text + buf.slice(pos);
@@ -174,15 +175,20 @@ function processVimKey(key: KeyEvent, state: RenderState): KeyResult | null {
       return { type: "handled" };
 
     case "buffer_edit":
-      // Snapshot before normal-mode edits (insert sessions handled via mode_change)
-      pushUndo(state.undo, state.inputBuffer, state.cursorPos);
+      if (result.mode === "insert") {
+        // Commands that edit + enter insert (o, O, c, C, cc):
+        // Mark insert entry with state BEFORE the edit — the entire
+        // edit + insert session is one undo unit (like vim).
+        markInsertEntry(state.undo, state.inputBuffer, state.cursorPos);
+      } else {
+        // Pure normal-mode edit (dd, x, D, etc) — standalone undo unit
+        pushUndo(state.undo, state.inputBuffer, state.cursorPos);
+      }
       state.inputBuffer = result.buffer;
       state.cursorPos = result.cursor;
       if (result.mode) {
         state.vim.mode = result.mode;
-        if (result.mode === "insert") markInsertEntry(state.undo, result.buffer, result.cursor);
       } else {
-        // Staying in normal mode — clamp cursor to last char
         clampCursorNormal(state);
       }
       return { type: "handled" };
@@ -196,11 +202,16 @@ function processVimKey(key: KeyEvent, state: RenderState): KeyResult | null {
       return { type: "handled" };
 
     case "visual_edit":
-      pushUndo(state.undo, state.inputBuffer, state.cursorPos);
+      if (result.mode === "insert") {
+        // visual c — edit + insert is one undo unit
+        markInsertEntry(state.undo, state.inputBuffer, state.cursorPos);
+      } else {
+        // visual d — standalone undo unit
+        pushUndo(state.undo, state.inputBuffer, state.cursorPos);
+      }
       state.inputBuffer = result.buffer;
       state.cursorPos = result.cursor;
       state.vim.mode = result.mode;
-      if (result.mode === "insert") markInsertEntry(state.undo, result.buffer, result.cursor);
       return { type: "handled" };
 
     case "undo": {
@@ -339,6 +350,7 @@ function handlePaste(position: "after" | "before", state: RenderState): void {
   pasteFromClipboard().then((text) => {
     if (!text) return;
 
+    pushUndo(state.undo, state.inputBuffer, state.cursorPos);
     const buf = state.inputBuffer;
     const cursor = state.cursorPos;
     const insertAt = position === "after" ? cursor + 1 : cursor;
