@@ -150,6 +150,10 @@ export function createHandler(server: DaemonServer) {
           contextTokens: data.contextTokens,
         });
         server.subscribe(client, data.convId);
+        // Clear unread when a client views the conversation
+        if (convStore.clearUnread(data.convId)) {
+          server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(data.convId)! });
+        }
         break;
       }
 
