@@ -140,7 +140,7 @@ function toFile(conv: Conversation): ConversationFile {
     model: conv.model,
     messages: conv.messages,
     createdAt: conv.createdAt,
-    updatedAt: Date.now(),
+    updatedAt: conv.updatedAt,
     lastContextTokens: conv.lastContextTokens,
     marked: conv.marked,
   };
@@ -152,6 +152,7 @@ function fromFile(file: ConversationFile): Conversation {
     model: file.model,
     messages: file.messages,
     createdAt: file.createdAt,
+    updatedAt: file.updatedAt,
     lastContextTokens: file.lastContextTokens,
     marked: file.marked,
   };

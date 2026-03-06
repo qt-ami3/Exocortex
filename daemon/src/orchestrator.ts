@@ -53,6 +53,7 @@ export async function orchestrateSendMessage(
   }
 
   conv.messages.push({ role: "user", content: text, metadata: null });
+  conv.updatedAt = Date.now();
 
   // Update sidebar immediately with the user's message as preview
   server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(convId)! });
@@ -166,6 +167,7 @@ export async function orchestrateSendMessage(
     // Push the actual conversation messages — preserves the full
     // multi-turn structure (assistant → user[tool_result] → assistant → ...)
     conv.messages.push(...storedMessages);
+    conv.updatedAt = Date.now();
 
     server.sendToSubscribers(convId, {
       type: "message_complete",

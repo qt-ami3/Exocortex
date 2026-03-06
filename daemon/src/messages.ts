@@ -39,16 +39,19 @@ export interface Conversation {
   model: ModelId;
   messages: StoredMessage[];
   createdAt: number;
+  updatedAt: number;
   lastContextTokens: number | null;
   marked: boolean;
 }
 
 export function createConversation(id: string, model: ModelId): Conversation {
+  const now = Date.now();
   return {
     id,
     model,
     messages: [],
-    createdAt: Date.now(),
+    createdAt: now,
+    updatedAt: now,
     lastContextTokens: null,
     marked: false,
   };

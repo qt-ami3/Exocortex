@@ -142,7 +142,7 @@ export function getSummary(id: string): ConversationSummary | null {
     id: conv.id,
     model: conv.model,
     createdAt: conv.createdAt,
-    updatedAt: Date.now(),
+    updatedAt: conv.updatedAt,
     messageCount: conv.messages.length,
     preview,
     marked: conv.marked,
