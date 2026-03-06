@@ -139,5 +139,13 @@ export class DaemonServer {
     client.subscriptions.delete(convId);
   }
 
+  /** Check if any connected client is subscribed to a conversation. */
+  hasSubscribers(convId: string): boolean {
+    for (const client of this.clients.values()) {
+      if (client.subscriptions.has(convId)) return true;
+    }
+    return false;
+  }
+
   get clientCount(): number { return this.clients.size; }
 }

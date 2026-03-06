@@ -288,9 +288,13 @@ export function renderSidebar(
     const isCurrent = conv.id === currentConvId;
     const isPendingDelete = conv.id === sidebar.pendingDeleteId;
 
+    // Streaming/unread indicator
+    const streamIcon = conv.streaming ? "◉ " : conv.unread ? "◉ " : "";
+    const streamIconColor = conv.streaming ? theme.accent : conv.unread ? theme.success : "";
+
     const prefix = isSelected ? "▸ " : "  ";
     const markIcon = conv.marked ? "★ " : "";
-    const maxTitle = innerWidth - prefix.length - markIcon.length;
+    const maxTitle = innerWidth - prefix.length - streamIcon.length - markIcon.length;
     let title = conv.preview || "(empty)";
     const nlIdx = title.indexOf("\n");
     if (nlIdx !== -1) title = title.slice(0, nlIdx);
@@ -299,13 +303,14 @@ export function renderSidebar(
     const bg = isSelected ? theme.sidebarSelBg : theme.sidebarBg;
     const fg = isPendingDelete ? theme.error : (isSelected || isCurrent) ? theme.text : theme.muted;
     const titleText = isCurrent && !isPendingDelete ? theme.bold + title + theme.boldOff : title;
+    const streamIconColored = streamIcon ? streamIconColor + streamIcon + fg : "";
     const markIconColored = markIcon ? theme.warning + markIcon + fg : "";
-    const plainLen = prefix.length + markIcon.length + title.length;
+    const plainLen = prefix.length + streamIcon.length + markIcon.length + title.length;
     const padding = Math.max(0, innerWidth - plainLen);
 
     rows.push(
       theme.reset + bg + fg +
-      prefix + markIconColored + titleText + " ".repeat(padding) +
+      prefix + streamIconColored + markIconColored + titleText + " ".repeat(padding) +
       theme.reset + borderFg + "│" + theme.reset,
     );
   }

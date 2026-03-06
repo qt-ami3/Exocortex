@@ -240,6 +240,8 @@ export function loadAll(): ConversationSummary[] {
         preview,
         marked: file.marked,
         pinned: file.pinned,
+        streaming: false,
+        unread: false,
       });
     } catch (err) {
       log("error", `persistence: failed to load summary for ${filename}: ${err}`);

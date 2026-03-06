@@ -17,6 +17,7 @@ const conversations = new Map<string, Conversation>();
 const activeJobs = new Map<string, AbortController>();
 const dirty = new Set<string>();
 const chunkCounters = new Map<string, number>();
+const unread = new Set<string>();
 
 const CHUNK_SAVE_INTERVAL = 5;
 
@@ -159,6 +160,8 @@ export function getSummary(id: string): ConversationSummary | null {
     preview,
     marked: conv.marked,
     pinned: conv.pinned,
+    streaming: activeJobs.has(conv.id),
+    unread: unread.has(conv.id),
   };
 }
 
@@ -173,6 +176,20 @@ export function getDisplayData(id: string): ConversationDisplayData | null {
   const conv = conversations.get(id);
   if (!conv) return null;
   return buildDisplayData(conv.id, conv.model, conv.messages, conv.lastContextTokens, summarizeTool);
+}
+
+// ── Unread state (runtime only, not persisted) ──────────────────────
+
+export function markUnread(convId: string): void {
+  unread.add(convId);
+}
+
+export function clearUnread(convId: string): boolean {
+  return unread.delete(convId);
+}
+
+export function isUnread(convId: string): boolean {
+  return unread.has(convId);
 }
 
 // ── Active jobs (abort controllers for in-flight streams) ───────────

@@ -55,6 +55,10 @@ export function createHandler(server: DaemonServer) {
 
       case "subscribe": {
         server.subscribe(client, cmd.convId);
+        // Clear unread when a client views the conversation
+        if (convStore.clearUnread(cmd.convId)) {
+          server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(cmd.convId)! });
+        }
         server.sendTo(client, { type: "ack", reqId: cmd.reqId, convId: cmd.convId });
         break;
       }

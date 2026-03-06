@@ -98,6 +98,8 @@ export interface ConversationSummary {
   preview: string;
   marked: boolean;
   pinned: boolean;
+  streaming: boolean;
+  unread: boolean;
 }
 
 // ── Tool display info (daemon → TUI on connect) ────────────────────

@@ -62,6 +62,8 @@ export async function orchestrateSendMessage(
   const ac = new AbortController();
   convStore.setActiveJob(convId, ac);
 
+  // Broadcast streaming indicator to all clients (sidebar)
+  server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(convId)! });
   server.sendToSubscribers(convId, { type: "streaming_started", convId, model: conv.model });
 
   const apiMessages = conv.messages.map((m) => ({
@@ -179,6 +181,11 @@ export async function orchestrateSendMessage(
 
     log("info", `orchestrator: message complete for ${convId} (${result.tokens} tokens, ${result.blocks.length} blocks, ${endedAt - startedAt}ms)`);
 
+    // Mark unread if no client is viewing this conversation
+    if (!server.hasSubscribers(convId)) {
+      convStore.markUnread(convId);
+    }
+
     // Persist and notify sidebar
     convStore.markDirty(convId);
     convStore.flush(convId);
@@ -230,6 +237,8 @@ export async function orchestrateSendMessage(
     convStore.markDirty(convId);
     convStore.flush(convId);
     server.sendToSubscribers(convId, { type: "streaming_stopped", convId });
+    // Broadcast updated summary (streaming=false, possibly unread=true)
+    server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(convId)! });
     ext.onComplete();
   }
 }
