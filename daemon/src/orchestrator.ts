@@ -58,6 +58,7 @@ export async function orchestrateSendMessage(
 
   const ac = new AbortController();
   convStore.setActiveJob(convId, ac);
+  convStore.initStreamingBlocks(convId);
 
   // Broadcast sidebar update (user message preview + streaming indicator)
   server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(convId)! });
@@ -87,6 +88,8 @@ export async function orchestrateSendMessage(
       } else if (blockType === "thinking") {
         partialContent.push({ type: "thinking", thinking: "", signature: "" });
       }
+      // Track for late-joining clients
+      convStore.pushStreamingBlock(convId, { type: blockType, text: "" });
       convStore.markDirty(convId);
       convStore.flush(convId);
       convStore.resetChunkCounter(convId);
@@ -95,12 +98,14 @@ export async function orchestrateSendMessage(
       server.sendToSubscribers(convId, { type: "text_chunk", convId, text: chunk });
       const last = partialContent[partialContent.length - 1];
       if (last?.type === "text") last.text += chunk;
+      convStore.appendToStreamingBlock(convId, "text", chunk);
       convStore.onChunk(convId);
     },
     onThinkingChunk(chunk) {
       server.sendToSubscribers(convId, { type: "thinking_chunk", convId, text: chunk });
       const last = partialContent[partialContent.length - 1];
       if (last?.type === "thinking") last.thinking += chunk;
+      convStore.appendToStreamingBlock(convId, "thinking", chunk);
       convStore.onChunk(convId);
     },
     onSignature(signature) {
@@ -119,10 +124,24 @@ export async function orchestrateSendMessage(
         input: block.input,
         summary: block.summary,
       });
+      convStore.pushStreamingBlock(convId, {
+        type: "tool_call",
+        toolCallId: block.toolCallId,
+        toolName: block.toolName,
+        input: block.input,
+        summary: block.summary,
+      });
     },
     onToolResult(block) {
       server.sendToSubscribers(convId, {
         type: "tool_result", convId,
+        toolCallId: block.toolCallId,
+        toolName: block.toolName,
+        output: block.output,
+        isError: block.isError,
+      });
+      convStore.pushStreamingBlock(convId, {
+        type: "tool_result",
         toolCallId: block.toolCallId,
         toolName: block.toolName,
         output: block.output,
@@ -265,6 +284,7 @@ export async function orchestrateSendMessage(
     }
   } finally {
     convStore.clearActiveJob(convId);
+    convStore.clearStreamingBlocks(convId);
     convStore.resetChunkCounter(convId);
     convStore.markDirty(convId);
     convStore.flush(convId);

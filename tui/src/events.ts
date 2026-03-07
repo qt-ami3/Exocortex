@@ -51,6 +51,10 @@ export function handleEvent(
       if (!state.pendingAI) {
         state.pendingAI = createPendingAI(Date.now(), event.model);
       }
+      // Populate with accumulated blocks from daemon (late-join catch-up)
+      if (event.blocks && event.blocks.length > 0 && state.pendingAI.blocks.length === 0) {
+        state.pendingAI.blocks = [...event.blocks];
+      }
       break;
     }
 

@@ -152,7 +152,12 @@ export function createHandler(server: DaemonServer) {
         // If the conversation is actively streaming, tell the late-joining client
         // so it creates pendingAI and picks up future chunks.
         if (convStore.isStreaming(data.convId)) {
-          server.sendTo(client, { type: "streaming_started", convId: data.convId, model: data.model });
+          server.sendTo(client, {
+            type: "streaming_started",
+            convId: data.convId,
+            model: data.model,
+            blocks: convStore.getStreamingBlocks(data.convId) ?? [],
+          });
         }
         // Clear unread when a client views the conversation
         if (convStore.clearUnread(data.convId)) {

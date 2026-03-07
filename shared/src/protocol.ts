@@ -127,6 +127,8 @@ export interface StreamingStartedEvent {
   type: "streaming_started";
   convId: string;
   model: ModelId;
+  /** Accumulated blocks so far — included for late-joining clients. */
+  blocks?: Block[];
 }
 
 export interface StreamingStoppedEvent {

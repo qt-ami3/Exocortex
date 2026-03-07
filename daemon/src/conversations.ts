@@ -6,7 +6,7 @@
  * to persistence.ts.
  */
 
-import type { Conversation, ModelId, ConversationSummary } from "./messages";
+import type { Conversation, ModelId, ConversationSummary, Block } from "./messages";
 import { createConversation } from "./messages";
 import * as persistence from "./persistence";
 import { log } from "./log";
@@ -18,6 +18,8 @@ const activeJobs = new Map<string, AbortController>();
 const dirty = new Set<string>();
 const chunkCounters = new Map<string, number>();
 const unread = new Set<string>();
+/** Accumulated display blocks for in-flight streams (for late-joining clients). */
+const streamingBlocks = new Map<string, Block[]>();
 
 const CHUNK_SAVE_INTERVAL = 5;
 
@@ -114,9 +116,19 @@ export function resetChunkCounter(id: string): void {
   chunkCounters.delete(id);
 }
 
-/** Get conversation summaries for the sidebar. */
+/** Get conversation summaries for the sidebar (from in-memory state). */
 export function listSummaries(): ConversationSummary[] {
-  return persistence.loadAll();
+  const summaries: ConversationSummary[] = [];
+  for (const conv of conversations.values()) {
+    const s = getSummary(conv.id);
+    if (s) summaries.push(s);
+  }
+  // Pinned first (stable order among pinned), then unpinned by updatedAt desc
+  summaries.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return b.updatedAt - a.updatedAt;
+  });
+  return summaries;
 }
 
 /** Toggle or set the marked flag on a conversation. */
@@ -209,4 +221,35 @@ export function getActiveJob(convId: string): AbortController | undefined {
 
 export function clearActiveJob(convId: string): void {
   activeJobs.delete(convId);
+}
+
+// ── Streaming blocks (accumulated display blocks for late-joiners) ──
+
+/** Initialize streaming blocks for a new stream. */
+export function initStreamingBlocks(convId: string): void {
+  streamingBlocks.set(convId, []);
+}
+
+/** Get the accumulated streaming blocks (for late-joining clients). */
+export function getStreamingBlocks(convId: string): Block[] | undefined {
+  return streamingBlocks.get(convId);
+}
+
+/** Push a new block to the streaming accumulator. */
+export function pushStreamingBlock(convId: string, block: Block): void {
+  const blocks = streamingBlocks.get(convId);
+  if (blocks) blocks.push(block);
+}
+
+/** Append text to the last streaming block of the given type. */
+export function appendToStreamingBlock(convId: string, type: "text" | "thinking", chunk: string): void {
+  const blocks = streamingBlocks.get(convId);
+  if (!blocks) return;
+  const last = blocks[blocks.length - 1];
+  if (last?.type === type) last.text += chunk;
+}
+
+/** Clear streaming blocks (call when stream finishes). */
+export function clearStreamingBlocks(convId: string): void {
+  streamingBlocks.delete(convId);
 }
