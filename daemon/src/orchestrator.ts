@@ -78,6 +78,8 @@ export async function orchestrateSendMessage(
   // after each full round. partialContent only tracks the in-flight round.
   const agentState: AgentState = { completedMessages: [], tokens: 0 };
   const partialContent: import("./messages").ApiContentBlock[] = [];
+  /** Blocks that survived persistence on abort/error — sent to TUI so it can trim display. */
+  let abortPersistedBlocks: import("./messages").Block[] | undefined;
 
   const callbacks: AgentCallbacks = {
     onBlockStart(blockType) {
@@ -224,6 +226,15 @@ export async function orchestrateSendMessage(
     const hasContent = safeContent.some(b =>
       (b.type === "text" && b.text) || (b.type === "thinking" && b.thinking)
     );
+    // Convert safe content to display blocks for the TUI
+    abortPersistedBlocks = safeContent
+      .filter(b => (b.type === "text" && b.text) || (b.type === "thinking" && b.thinking))
+      .map(b => {
+        if (b.type === "thinking") return { type: "thinking" as const, text: b.thinking };
+        if (b.type === "text") return { type: "text" as const, text: b.text };
+        return { type: "text" as const, text: "" };
+      });
+
     if (hasContent) {
       conv.messages.push({
         role: "assistant",
@@ -253,7 +264,7 @@ export async function orchestrateSendMessage(
     convStore.resetChunkCounter(convId);
     convStore.markDirty(convId);
     convStore.flush(convId);
-    server.sendToSubscribers(convId, { type: "streaming_stopped", convId });
+    server.sendToSubscribers(convId, { type: "streaming_stopped", convId, persistedBlocks: abortPersistedBlocks });
     // Broadcast updated summary (streaming=false, possibly unread=true)
     server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(convId)! });
     ext.onComplete();

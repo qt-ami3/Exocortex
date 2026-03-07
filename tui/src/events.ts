@@ -130,9 +130,15 @@ export function handleEvent(
 
     case "streaming_stopped": {
       if (event.convId !== state.convId) break;
-      if (state.pendingAI && state.pendingAI.blocks.length > 0) {
-        state.pendingAI.metadata.endedAt ??= Date.now();
-        state.messages.push(state.pendingAI);
+      if (state.pendingAI) {
+        // On abort/error: replace rendered blocks with what the daemon actually persisted
+        if (event.persistedBlocks) {
+          state.pendingAI.blocks = event.persistedBlocks;
+        }
+        if (state.pendingAI.blocks.length > 0) {
+          state.pendingAI.metadata.endedAt ??= Date.now();
+          state.messages.push(state.pendingAI);
+        }
       }
       state.pendingAI = null;
 

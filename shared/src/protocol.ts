@@ -132,6 +132,8 @@ export interface StreamingStartedEvent {
 export interface StreamingStoppedEvent {
   type: "streaming_stopped";
   convId: string;
+  /** On abort/error: the blocks that were safe to persist. TUI replaces its pending blocks with these. */
+  persistedBlocks?: Block[];
 }
 
 export interface BlockStartEvent {
