@@ -320,6 +320,10 @@ function handleVimAction(action: string, state: RenderState): KeyResult {
         }
       }
       return { type: "handled" };
+    case "scroll_top":
+    case "scroll_bottom":
+      handleScrollAction(action as Action, state);
+      return { type: "handled" };
     default:
       return { type: "handled" };
   }

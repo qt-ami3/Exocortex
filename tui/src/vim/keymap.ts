@@ -29,8 +29,8 @@ const KEYMAP: KeymapEntry[] = [
   { mode: "normal", context: "prompt", key: "W",  command: { type: "motion", name: "word_forward_big" } },
   { mode: "normal", context: "prompt", key: "B",  command: { type: "motion", name: "word_backward_big" } },
   { mode: "normal", context: "prompt", key: "E",  command: { type: "motion", name: "word_end_big" } },
-  { mode: "normal", context: "prompt", key: "gg", command: { type: "motion", name: "buffer_start" } },
-  { mode: "normal", context: "prompt", key: "G",  command: { type: "motion", name: "buffer_end" } },
+  { mode: "normal", context: "prompt", key: "gg", command: { type: "action", action: "scroll_top" } },
+  { mode: "normal", context: "prompt", key: "G",  command: { type: "action", action: "scroll_bottom" } },
 
   // Mode changes
   { mode: "normal", context: "prompt", key: "i",  command: { type: "mode_change", mode: "insert", cursor: "before" } },
