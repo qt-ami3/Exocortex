@@ -10,7 +10,7 @@ export interface KeyEvent {
       | "up" | "down"
       | "ctrl-b" | "ctrl-c" | "ctrl-d" | "ctrl-e" | "ctrl-f"
       | "ctrl-j" | "ctrl-k" | "ctrl-l" | "ctrl-m" | "ctrl-n"
-      | "ctrl-o" | "ctrl-r" | "ctrl-u" | "ctrl-y"
+      | "ctrl-o" | "ctrl-q" | "ctrl-r" | "ctrl-u" | "ctrl-y"
       | "ctrl-shift-o"
       | "escape"
       | "paste"
@@ -68,6 +68,7 @@ export function parseKeys(data: Buffer): KeyEvent[] {
     if (code === 12) { events.push({ type: "ctrl-l" }); i++; continue; }
     if (code === 14) { events.push({ type: "ctrl-n" }); i++; continue; }
     if (code === 15) { events.push({ type: "ctrl-o" }); i++; continue; }
+    if (code === 17) { events.push({ type: "ctrl-q" }); i++; continue; }
     if (code === 18) { events.push({ type: "ctrl-r" }); i++; continue; }
     if (code === 21) { events.push({ type: "ctrl-u" }); i++; continue; }
     if (code === 25) { events.push({ type: "ctrl-y" }); i++; continue; }

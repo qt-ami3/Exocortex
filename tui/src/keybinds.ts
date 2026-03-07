@@ -80,7 +80,7 @@ export type Action =
 const BINDS: Record<string, Action> = {
   // Global
   "ctrl-c":     "quit",
-  "escape":     "abort",
+  "ctrl-q":     "abort",
   "ctrl-m":     "sidebar_toggle",
   "ctrl-j":     "focus_cycle",
   "ctrl-k":     "focus_cycle",

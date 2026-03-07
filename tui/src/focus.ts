@@ -125,8 +125,13 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
       return { type: "handled" };
   }
 
+  // ── Abort (Ctrl+Q) — always fires, regardless of focus or vim mode ─
+  if (action === "abort") {
+    return { type: "abort" };
+  }
+
   // ── Sidebar pending delete cancel (before vim) ──────────────────
-  if (action === "abort" && state.panelFocus === "sidebar" && state.sidebar.pendingDeleteId) {
+  if (key.type === "escape" && state.panelFocus === "sidebar" && state.sidebar.pendingDeleteId) {
     state.sidebar.pendingDeleteId = null;
     // Also normalize vim to normal mode so we don't eat the next Escape
     if (state.vim.mode === "insert") {
@@ -138,11 +143,6 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
   // ── Vim processing ─────────────────────────────────────────────
   const vimResult = processVimKey(key, state);
   if (vimResult) return vimResult;
-
-  // ── Abort (only when vim doesn't consume Esc) ──────────────────
-  if (action === "abort") {
-    return { type: "abort" };
-  }
 
   if (state.panelFocus === "sidebar" && state.sidebar.open) {
     return handleSidebarFocused(key, state);
@@ -276,8 +276,6 @@ function handleVimAction(action: string, state: RenderState): KeyResult {
   switch (action) {
     case "quit":
       return { type: "quit" };
-    case "abort":
-      return { type: "abort" };
     case "focus_prompt":
       // Vim i/a in sidebar/history → focus prompt + enter insert
       state.vim.mode = "insert";
