@@ -129,6 +129,12 @@ export class DaemonServer {
     }
   }
 
+  sendToSubscribersExcept(convId: string, event: Event, except: ConnectedClient): void {
+    for (const client of this.clients.values()) {
+      if (client !== except && client.subscriptions.has(convId)) this.sendTo(client, event);
+    }
+  }
+
   // ── Subscriptions ───────────────────────────────────────────────
 
   subscribe(client: ConnectedClient, convId: string): void {

@@ -248,6 +248,12 @@ export interface ConversationPinnedEvent {
   pinned: boolean;
 }
 
+export interface UserMessageEvent {
+  type: "user_message";
+  convId: string;
+  text: string;
+}
+
 export interface SystemMessageEvent {
   type: "system_message";
   convId: string;
@@ -288,6 +294,7 @@ export type Event =
   | ConversationDeletedEvent
   | ConversationMarkedEvent
   | ConversationPinnedEvent
+  | UserMessageEvent
   | SystemMessageEvent
   | ToolsAvailableEvent
   | ErrorEvent;

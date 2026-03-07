@@ -264,6 +264,12 @@ export function handleEvent(
       break;
     }
 
+    case "user_message": {
+      if (event.convId !== state.convId) break;
+      state.messages.push({ role: "user", text: event.text, metadata: null });
+      break;
+    }
+
     case "system_message": {
       if (event.convId !== state.convId) break;
       const color = event.color === "error" ? theme.error : theme.muted;

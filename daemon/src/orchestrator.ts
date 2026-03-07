@@ -56,6 +56,9 @@ export async function orchestrateSendMessage(
   // Pinned conversations don't change position — don't bump updatedAt
   if (!conv.pinned) conv.updatedAt = Date.now();
 
+  // Notify other subscribers about the user message (sender already added it locally)
+  server.sendToSubscribersExcept(convId, { type: "user_message", convId, text }, client);
+
   const ac = new AbortController();
   convStore.setActiveJob(convId, ac);
   convStore.initStreamingBlocks(convId);
