@@ -320,7 +320,7 @@ export function renderSidebar(
     const prefix = isSelected ? "▸ " : "  ";
     const markIcon = conv.marked ? "★ " : "";
     const maxTitle = innerWidth - prefix.length - streamIcon.length - markIcon.length;
-    let title = conv.preview || "(empty)";
+    let title = conv.title || conv.preview || "(empty)";
     const nlIdx = title.indexOf("\n");
     if (nlIdx !== -1) title = title.slice(0, nlIdx);
     if (title.length > maxTitle) title = title.slice(0, maxTitle - 1) + "…";

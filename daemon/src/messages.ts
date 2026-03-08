@@ -44,6 +44,8 @@ export interface Conversation {
   marked: boolean;
   pinned: boolean;
   sortOrder: number;
+  /** Explicit user-set title. Null means use auto-generated preview. */
+  title: string | null;
 }
 
 export function createConversation(id: string, model: ModelId, sortOrder?: number): Conversation {
@@ -58,5 +60,6 @@ export function createConversation(id: string, model: ModelId, sortOrder?: numbe
     marked: false,
     pinned: false,
     sortOrder: sortOrder ?? -now,
+    title: null,
   };
 }

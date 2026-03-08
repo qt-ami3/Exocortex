@@ -80,6 +80,9 @@ function handleSubmit(): void {
     if (cmdResult.type === "model_changed" && state.convId) {
       daemon.setModel(state.convId, cmdResult.model);
     }
+    if (cmdResult.type === "rename_conversation" && state.convId) {
+      daemon.renameConversation(state.convId, cmdResult.title);
+    }
     scheduleRender();
     return;
   }

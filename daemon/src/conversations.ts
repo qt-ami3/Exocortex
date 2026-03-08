@@ -69,6 +69,15 @@ export function setModel(id: string, model: ModelId): boolean {
   return true;
 }
 
+export function rename(id: string, title: string): boolean {
+  const conv = conversations.get(id);
+  if (!conv) return false;
+  conv.title = title;
+  markDirty(id);
+  flush(id);
+  return true;
+}
+
 // ── Persistence ─────────────────────────────────────────────────────
 
 /** Load all conversations from disk into memory on daemon startup. */
@@ -218,6 +227,7 @@ export function getSummary(id: string): ConversationSummary | null {
     updatedAt: conv.updatedAt,
     messageCount: conv.messages.length,
     preview,
+    title: conv.title ?? null,
     marked: conv.marked,
     pinned: conv.pinned,
     streaming: activeJobs.has(conv.id),

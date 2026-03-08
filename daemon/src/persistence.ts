@@ -15,7 +15,7 @@ import type { Conversation, StoredMessage, ApiMessage, ModelId, ConversationSumm
 
 // ── Schema version ──────────────────────────────────────────────────
 
-const CURRENT_VERSION = 6;
+const CURRENT_VERSION = 7;
 
 interface ConversationFileV1 {
   version: 1;
@@ -81,7 +81,21 @@ interface ConversationFileV6 {
   sortOrder: number;
 }
 
-type ConversationFile = ConversationFileV6;
+interface ConversationFileV7 {
+  version: 7;
+  id: string;
+  model: ModelId;
+  messages: StoredMessage[];
+  createdAt: number;
+  updatedAt: number;
+  lastContextTokens: number | null;
+  marked: boolean;
+  pinned: boolean;
+  sortOrder: number;
+  title: string | null;
+}
+
+type ConversationFile = ConversationFileV7;
 
 // ── Migrations ──────────────────────────────────────────────────────
 
@@ -134,6 +148,15 @@ function migrateV5toV6(data: ConversationFileV5): ConversationFileV6 {
   };
 }
 
+/** v6 → v7: Add title field. */
+function migrateV6toV7(data: ConversationFileV6): ConversationFileV7 {
+  return {
+    ...data,
+    version: 7,
+    title: null,
+  };
+}
+
 function migrate(data: Record<string, unknown>): ConversationFile {
   let version = (data.version as number) ?? 1;
 
@@ -160,6 +183,11 @@ function migrate(data: Record<string, unknown>): ConversationFile {
   if (version === 5) {
     data = migrateV5toV6(data as unknown as ConversationFileV5) as unknown as Record<string, unknown>;
     version = 6;
+  }
+
+  if (version === 6) {
+    data = migrateV6toV7(data as unknown as ConversationFileV6) as unknown as Record<string, unknown>;
+    version = 7;
   }
 
   if (version === CURRENT_VERSION) {
@@ -198,6 +226,7 @@ function toFile(conv: Conversation): ConversationFile {
     marked: conv.marked,
     pinned: conv.pinned,
     sortOrder: conv.sortOrder,
+    title: conv.title,
   };
 }
 
@@ -212,6 +241,7 @@ function fromFile(file: ConversationFile): Conversation {
     marked: file.marked,
     pinned: file.pinned,
     sortOrder: file.sortOrder,
+    title: file.title,
   };
 }
 
@@ -267,6 +297,7 @@ export function loadAll(): ConversationSummary[] {
         updatedAt: file.updatedAt,
         messageCount: file.messages.length,
         preview,
+        title: file.title,
         marked: file.marked,
         pinned: file.pinned,
         streaming: false,

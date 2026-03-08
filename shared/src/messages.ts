@@ -96,6 +96,8 @@ export interface ConversationSummary {
   updatedAt: number;
   messageCount: number;
   preview: string;
+  /** Explicit user-set title. Takes priority over auto-generated preview. */
+  title: string | null;
   marked: boolean;
   pinned: boolean;
   streaming: boolean;

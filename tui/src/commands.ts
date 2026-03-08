@@ -23,7 +23,8 @@ export type CommandResult =
   | { type: "handled" }
   | { type: "quit" }
   | { type: "new_conversation" }
-  | { type: "model_changed"; model: ModelId };
+  | { type: "model_changed"; model: ModelId }
+  | { type: "rename_conversation"; title: string };
 
 export interface SlashCommand {
   name: string;
@@ -69,6 +70,28 @@ const commands: SlashCommand[] = [
       state.contextTokens = null;
       // Return new_conversation so main.ts can unsubscribe + clear convId
       return { type: "new_conversation" };
+    },
+  },
+  {
+    name: "/rename",
+    description: "Rename the current conversation",
+    handler: (text, state) => {
+      const title = text.slice("/rename".length).trim();
+      if (!title) {
+        state.messages.push({ role: "system", text: "Usage: /rename <title>", metadata: null });
+        clearPrompt(state);
+        return { type: "handled" };
+      }
+      if (!state.convId) {
+        state.messages.push({ role: "system", text: "No active conversation to rename.", metadata: null });
+        clearPrompt(state);
+        return { type: "handled" };
+      }
+      // Optimistic update: immediately reflect in sidebar
+      const conv = state.sidebar.conversations.find(c => c.id === state.convId);
+      if (conv) conv.title = title;
+      clearPrompt(state);
+      return { type: "rename_conversation", title };
     },
   },
   {

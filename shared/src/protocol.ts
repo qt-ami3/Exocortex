@@ -96,6 +96,13 @@ export interface MoveConversationCommand {
   direction: "up" | "down";
 }
 
+export interface RenameConversationCommand {
+  type: "rename_conversation";
+  reqId?: string;
+  convId: string;
+  title: string;
+}
+
 export type Command =
   | PingCommand
   | NewConversationCommand
@@ -109,7 +116,8 @@ export type Command =
   | DeleteConversationCommand
   | MarkConversationCommand
   | PinConversationCommand
-  | MoveConversationCommand;
+  | MoveConversationCommand
+  | RenameConversationCommand;
 
 // ── Events (daemon → client) ────────────────────────────────────────
 
