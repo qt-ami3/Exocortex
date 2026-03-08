@@ -144,10 +144,9 @@ export function buildMessageLines(state: RenderState, availableWidth: number): s
   for (const msg of state.messages) {
     if (msg.role === "user") {
       lines.push(...renderUserMessage(msg.text, availableWidth));
-      lines.push("");
     } else if (msg.role === "assistant") {
+      // AI messages: no top or bottom margin
       lines.push(...renderAIMessage(msg, contentWidth, state.toolRegistry, state.showToolOutput));
-      lines.push("");
     } else {
       const color = msg.color || theme.dim;
       for (const sl of msg.text.split("\n")) {
@@ -156,10 +155,9 @@ export function buildMessageLines(state: RenderState, availableWidth: number): s
     }
   }
 
-  // Currently streaming AI message
+  // Currently streaming AI message — no margins
   if (state.pendingAI) {
     lines.push(...renderAIMessage(state.pendingAI, contentWidth, state.toolRegistry, state.showToolOutput));
-    lines.push("");
   }
 
   return lines;
