@@ -1,33 +1,96 @@
 /**
  * Glob tool — fast file pattern matching.
  *
- * Uses Bun.Glob for async iteration. Returns matching file paths
- * sorted by modification time (most recent first).
+ * Respects .gitignore by default: when inside a git repository, uses
+ * `git ls-files` to obtain the set of tracked + untracked-but-not-ignored
+ * files, then filters that list with Bun.Glob.match().
+ *
+ * Falls back to Bun.Glob.scan() with a hardcoded exclusion list when
+ * git is unavailable or the directory is outside a repo.
+ *
+ * Pass `no_ignore: true` to bypass all filtering and scan the raw filesystem.
+ *
+ * Returns matching file paths sorted by modification time (most recent first).
  */
 
 import type { Tool, ToolResult, ToolSummary } from "./types";
 import { cap } from "./util";
 import { log } from "../log";
 
-// ── Execution ──────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────
+
+/** Directories to skip in the non-git fallback path (mirrors grep tool). */
+const EXCLUDED_DIRS = [".git", ".svn", ".hg", ".bzr", "node_modules"];
+
+// ── Helpers ───────────────────────────────────────────────────────
+
+/**
+ * Ask git for every file that is either tracked or untracked-but-not-ignored
+ * under `cwd`.  Returns `null` when git is unavailable or `cwd` is not inside
+ * a repository, so the caller can fall back gracefully.
+ */
+async function getGitFiles(cwd: string): Promise<string[] | null> {
+  try {
+    const proc = Bun.spawn(
+      ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+      { cwd, stdout: "pipe", stderr: "pipe" },
+    );
+    const stdout = await new Response(proc.stdout).text();
+    const code = await proc.exited;
+    if (code !== 0) return null;
+    return stdout.trimEnd().split("\n").filter(Boolean);
+  } catch {
+    return null;
+  }
+}
+
+// ── Execution ─────────────────────────────────────────────────────
 
 async function executeGlob(input: Record<string, unknown>): Promise<ToolResult> {
   const pattern = input.pattern as string;
   if (!pattern) return { output: "Error: missing 'pattern' parameter", isError: true };
 
   const cwd = (input.path as string) ?? process.cwd();
+  const noIgnore = (input.no_ignore as boolean) ?? false;
 
   try {
     const glob = new Bun.Glob(pattern);
+
+    // --- Collect candidate paths --------------------------------
+
+    let matched: string[];
+
+    if (noIgnore) {
+      // Raw filesystem scan — no filtering at all.
+      matched = [];
+      for await (const entry of glob.scan({ cwd, onlyFiles: true, followSymlinks: true })) {
+        matched.push(entry);
+      }
+    } else {
+      const gitFiles = await getGitFiles(cwd);
+      if (gitFiles) {
+        // Fast path: filter the git-known file list with the glob pattern.
+        matched = gitFiles.filter(f => glob.match(f));
+      } else {
+        // Fallback: full scan, skipping common junk directories.
+        matched = [];
+        for await (const entry of glob.scan({ cwd, onlyFiles: true, followSymlinks: true })) {
+          const skip = EXCLUDED_DIRS.some(d => entry === d || entry.startsWith(d + "/"));
+          if (!skip) matched.push(entry);
+        }
+      }
+    }
+
+    // --- Stat & sort by mtime -----------------------------------
+
     const entries: { path: string; mtimeMs: number }[] = [];
 
-    for await (const entry of glob.scan({ cwd, onlyFiles: true, followSymlinks: true })) {
+    for (const rel of matched) {
       try {
-        const full = cwd + "/" + entry;
-        const stat = await Bun.file(full).stat();
-        entries.push({ path: entry, mtimeMs: stat?.mtimeMs ?? 0 });
+        const stat = await Bun.file(cwd + "/" + rel).stat();
+        entries.push({ path: rel, mtimeMs: stat?.mtimeMs ?? 0 });
       } catch {
-        entries.push({ path: entry, mtimeMs: 0 });
+        entries.push({ path: rel, mtimeMs: 0 });
       }
     }
 
@@ -46,14 +109,14 @@ async function executeGlob(input: Record<string, unknown>): Promise<ToolResult> 
   }
 }
 
-// ── Summary ────────────────────────────────────────────────────────
+// ── Summary ───────────────────────────────────────────────────────
 
 function summarize(input: Record<string, unknown>): ToolSummary {
   const pattern = (input.pattern as string) ?? "";
   return { label: "Glob", detail: pattern };
 }
 
-// ── Tool definition ────────────────────────────────────────────────
+// ── Tool definition ───────────────────────────────────────────────
 
 export const glob: Tool = {
   name: "glob",
@@ -63,6 +126,7 @@ export const glob: Tool = {
     properties: {
       pattern: { type: "string", description: "The glob pattern to match files against" },
       path: { type: "string", description: "Directory to search in. Defaults to working directory." },
+      no_ignore: { type: "boolean", description: "Bypass .gitignore filtering and scan all files (default false)." },
     },
     required: ["pattern"],
   },
