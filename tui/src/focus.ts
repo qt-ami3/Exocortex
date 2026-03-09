@@ -586,8 +586,10 @@ function selectHistoryMessage(modifier: "i" | "a", state: RenderState): KeyResul
 
   const lines = state.historyLines;
   let startRow = bounds.start;
-  let endRow = bounds.end - 1; // inclusive
+  // im: use contentEnd (excludes metadata/padding); am: use end
+  let endRow = (modifier === "i" ? bounds.contentEnd : bounds.end) - 1; // inclusive
 
+  // Trim blank lines from edges
   if (modifier === "i") {
     while (startRow <= endRow && stripAnsi(lines[startRow]).trim() === "") startRow++;
     while (endRow >= startRow && stripAnsi(lines[endRow]).trim() === "") endRow--;
@@ -604,7 +606,7 @@ function selectHistoryMessage(modifier: "i" | "a", state: RenderState): KeyResul
 }
 
 /** Find the MessageBound that contains the current history cursor row. */
-function findMessageBoundsAtCursor(state: RenderState): { start: number; end: number } | null {
+function findMessageBoundsAtCursor(state: RenderState): { start: number; end: number; contentEnd: number } | null {
   const row = state.historyCursor.row;
   for (const b of state.historyMessageBounds) {
     if (row >= b.start && row < b.end) return b;
@@ -619,7 +621,8 @@ function extractHistoryMessageText(state: RenderState, inner: boolean): string {
 
   const lines = state.historyLines;
   let startRow = bounds.start;
-  let endRow = bounds.end;
+  // im: up to contentEnd (excludes metadata/padding); am: full range
+  let endRow = inner ? bounds.contentEnd : bounds.end;
 
   if (inner) {
     while (startRow < endRow && stripAnsi(lines[startRow]).trim() === "") startRow++;

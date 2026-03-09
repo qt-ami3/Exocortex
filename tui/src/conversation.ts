@@ -5,7 +5,7 @@
  * The only file that knows how to render conversations.
  */
 
-import type { Block, AIMessage, ToolDisplayInfo } from "./messages";
+import type { Block, ToolDisplayInfo } from "./messages";
 import type { RenderState } from "./state";
 import { renderMetadata } from "./metadata";
 import { resolveToolDisplay } from "./toolstyles";
@@ -122,20 +122,6 @@ function renderUserMessage(text: string, cols: number): string[] {
   return lines;
 }
 
-// ── AI message rendering (left-aligned) ─────────────────────────────
-
-function renderAIMessage(msg: AIMessage, contentWidth: number, toolRegistry: ToolDisplayInfo[], showToolOutput: boolean): string[] {
-  const lines: string[] = [];
-
-  for (const block of msg.blocks) {
-    lines.push(...renderBlock(block, contentWidth, toolRegistry, showToolOutput));
-  }
-
-  lines.push(...renderMetadata(msg.metadata));
-
-  return lines;
-}
-
 // ── Message boundary tracking ───────────────────────────────────────
 
 /** Row range for a single message in the rendered history lines. */
@@ -144,6 +130,8 @@ export interface MessageBound {
   start: number;
   /** Last line index (exclusive). */
   end: number;
+  /** End of primary content (exclusive), before metadata/padding. im uses this. */
+  contentEnd: number;
 }
 
 // ── Build all display lines ─────────────────────────────────────────
@@ -162,25 +150,36 @@ export function buildMessageLines(
     if (msg.role === "user") {
       if (!firstUser) lines.push("");  // top margin (skip for first)
       lines.push(...renderUserMessage(msg.text, availableWidth));
+      const contentEnd = lines.length;
       lines.push("");                  // bottom margin
       firstUser = false;
+      messageBounds.push({ start, end: lines.length, contentEnd });
     } else if (msg.role === "assistant") {
-      // AI messages: no top or bottom margin
-      lines.push(...renderAIMessage(msg, contentWidth, state.toolRegistry, state.showToolOutput));
+      // AI messages: content blocks, then metadata
+      for (const block of msg.blocks) {
+        lines.push(...renderBlock(block, contentWidth, state.toolRegistry, state.showToolOutput));
+      }
+      const contentEnd = lines.length;
+      lines.push(...renderMetadata(msg.metadata));
+      messageBounds.push({ start, end: lines.length, contentEnd });
     } else {
       const color = msg.color || theme.dim;
       for (const sl of msg.text.split("\n")) {
         lines.push(`  ${color}${sl}${theme.reset}`);
       }
+      messageBounds.push({ start, end: lines.length, contentEnd: lines.length });
     }
-    messageBounds.push({ start, end: lines.length });
   }
 
   // Currently streaming AI message — no margins
   if (state.pendingAI) {
     const start = lines.length;
-    lines.push(...renderAIMessage(state.pendingAI, contentWidth, state.toolRegistry, state.showToolOutput));
-    messageBounds.push({ start, end: lines.length });
+    for (const block of state.pendingAI.blocks) {
+      lines.push(...renderBlock(block, contentWidth, state.toolRegistry, state.showToolOutput));
+    }
+    const contentEnd = lines.length;
+    lines.push(...renderMetadata(state.pendingAI.metadata));
+    messageBounds.push({ start, end: lines.length, contentEnd });
   }
 
   return { lines, messageBounds };
