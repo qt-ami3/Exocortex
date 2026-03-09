@@ -16,6 +16,7 @@ import { show_cursor, hide_cursor, cursor_block, cursor_underline, cursor_bar, a
 import { theme } from "./theme";
 import { clampCursor, stripAnsi, contentBounds } from "./historycursor";
 import { renderLineWithCursor, renderLineWithSelection } from "./cursorrender";
+import { highlightPromptInput } from "./promptHighlight";
 
 // ── ANSI positioning (non-color escapes) ────────────────────────────
 
@@ -50,6 +51,9 @@ function highlightPromptLine(
     effEnd = le === -1 ? buffer.length - 1 : le;
   }
 
+  // Use visible length (line may contain ANSI codes from command highlighting)
+  const visLen = stripAnsi(line).length;
+
   // Compute the buffer offset for this wrapped line
   const bufferLines = buffer.split("\n");
   let offset = 0;
@@ -61,11 +65,11 @@ function highlightPromptLine(
       // This wrapped line is within this buffer line
       const chunkIdx = wrappedLineIdx - wrappedIdx;
       const lineStart = offset + chunkIdx * maxWidth;
-      const lineEnd = lineStart + line.length - 1;
+      const lineEnd = lineStart + visLen - 1;
 
       if (effStart <= lineEnd && effEnd >= lineStart) {
         const colStart = isLinewise ? 0 : Math.max(0, effStart - lineStart);
-        const colEnd = isLinewise ? line.length - 1 : Math.min(line.length - 1, effEnd - lineStart);
+        const colEnd = isLinewise ? visLen - 1 : Math.min(visLen - 1, effEnd - lineStart);
         return renderLineWithSelection(line, colStart, colEnd);
       }
       return line;
@@ -127,6 +131,9 @@ export function render(state: RenderState): void {
   const { lines: inputLines, isNewLine, cursorLine, cursorCol, scrollOffset: newPromptScroll } =
     getInputLines(state.inputBuffer, state.cursorPos, maxInputWidth, maxInputRows, state.promptScrollOffset);
   state.promptScrollOffset = newPromptScroll;
+
+  // Syntax-highlight valid commands and macros in the input lines
+  const coloredInputLines = highlightPromptInput(inputLines, state.inputBuffer, maxInputWidth, newPromptScroll);
 
   const inputRowCount = inputLines.length;
 
@@ -311,9 +318,9 @@ export function render(state: RenderState): void {
       ? `${modeColor}${modeChar}${theme.reset} ${promptStyle}${promptGlyph}${theme.reset} `
       : `  ${promptStyle}${promptGlyph}${theme.reset} `;
 
-    let lineContent = inputLines[i];
+    let lineContent = coloredInputLines[i];
     if (promptInVisual) {
-      // Apply selection highlight to prompt input line
+      // Apply selection highlight to prompt input line (works on ANSI-colored text)
       const selStart = Math.min(state.vim.visualAnchor, state.cursorPos);
       const selEnd = Math.max(state.vim.visualAnchor, state.cursorPos);
       lineContent = highlightPromptLine(lineContent, i, selStart, selEnd,
