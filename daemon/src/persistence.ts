@@ -346,7 +346,7 @@ export function load(id: string): Conversation | null {
   }
 }
 
-/** Load all conversations from disk, returning summaries sorted by updatedAt desc. */
+/** Load all conversations from disk, returning summaries sorted by sortOrder. */
 export function loadAll(): ConversationSummary[] {
   ensureDir();
   const summaries: ConversationSummary[] = [];

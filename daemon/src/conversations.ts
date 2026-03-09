@@ -35,17 +35,30 @@ export function generateId(): string {
 
 // ── Conversations ───────────────────────────────────────────────────
 
-export function create(id: string, model: ModelId): Conversation {
-  // New conversations go to the top of unpinned: find min sortOrder and subtract 1
+/** Return a sortOrder value that would place an item at the top of the unpinned section. */
+function topUnpinnedOrder(excludeId?: string): number {
   let minOrder = 0;
   for (const c of conversations.values()) {
-    if (!c.pinned && c.sortOrder < minOrder) minOrder = c.sortOrder;
+    if (!c.pinned && c.id !== excludeId && c.sortOrder < minOrder) minOrder = c.sortOrder;
   }
-  const conv = createConversation(id, model, minOrder - 1);
+  return minOrder - 1;
+}
+
+export function create(id: string, model: ModelId): Conversation {
+  const conv = createConversation(id, model, topUnpinnedOrder());
   conversations.set(id, conv);
   markDirty(id);
   flush(id);
   return conv;
+}
+
+/** Bump an unpinned conversation to the top of the unpinned section. No-op for pinned conversations. */
+export function bumpToTop(id: string): boolean {
+  const conv = conversations.get(id);
+  if (!conv || conv.pinned) return false;
+  conv.sortOrder = topUnpinnedOrder(id);
+  markDirty(id);
+  return true;
 }
 
 export function get(id: string): Conversation | undefined {
@@ -170,11 +183,7 @@ export function pin(id: string, pinned: boolean): boolean {
     conv.sortOrder = maxOrder === -Infinity ? 0 : maxOrder + 1;
   } else {
     // Unpinning: place at the top of the unpinned section
-    let minOrder = 0;
-    for (const c of conversations.values()) {
-      if (!c.pinned && c.id !== id && c.sortOrder < minOrder) minOrder = c.sortOrder;
-    }
-    conv.sortOrder = minOrder - 1;
+    conv.sortOrder = topUnpinnedOrder(id);
   }
   markDirty(id);
   flush(id);

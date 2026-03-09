@@ -53,8 +53,8 @@ export async function orchestrateSendMessage(
   }
 
   conv.messages.push({ role: "user", content: text, metadata: null });
-  // Pinned conversations don't change position — don't bump updatedAt
-  if (!conv.pinned) conv.updatedAt = Date.now();
+  conv.updatedAt = Date.now();
+  convStore.bumpToTop(convId);
 
   // Notify other subscribers about the user message (sender already added it locally)
   server.sendToSubscribersExcept(convId, { type: "user_message", convId, text }, client);
@@ -200,7 +200,8 @@ export async function orchestrateSendMessage(
     // Push the actual conversation messages — preserves the full
     // multi-turn structure (assistant → user[tool_result] → assistant → ...)
     conv.messages.push(...storedMessages);
-    if (!conv.pinned) conv.updatedAt = Date.now();
+    conv.updatedAt = Date.now();
+    convStore.bumpToTop(convId);
 
     server.sendToSubscribers(convId, {
       type: "message_complete",
