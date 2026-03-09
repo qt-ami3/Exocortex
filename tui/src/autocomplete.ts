@@ -392,7 +392,7 @@ function getFilesystemMatches(pathToken: string): CompletionItem[] {
   try {
     const entries = readdirSync(dir, { withFileTypes: true });
     const filtered = entries
-      .filter(e => e.name.startsWith(prefix) && !e.name.startsWith("."))
+      .filter(e => e.name.startsWith(prefix) && (prefix.startsWith(".") || !e.name.startsWith(".")))
       .sort((a, b) => {
         // Directories first, then alphabetical
         const aDir = a.isDirectory() ? 0 : 1;
