@@ -49,7 +49,8 @@ function renderBlock(block: Block, contentWidth: number, toolRegistry: ToolDispl
       break;
     }
     case "text": {
-      for (const wl of wordWrap(block.text, contentWidth)) {
+      const text = block.text.replace(/^\n+/, "");
+      for (const wl of wordWrap(text, contentWidth)) {
         lines.push(`  ${wl}`);
       }
       break;
