@@ -27,6 +27,9 @@ export const MACRO_LIST: CompletionItem[] = [
   { name: "/long", desc: "Work until complete" },
   { name: "/diagnose", desc: "Pinpoint the cause" },
   { name: "/quality", desc: "Code quality assessment" },
+  { name: "/qutebrowser", desc: "Qutebrowser CLI context" },
+  { name: "/gmail", desc: "Gmail tool context" },
+  { name: "/twitter", desc: "Twitter tool context" },
   { name: "/worktree", desc: "Work in a git worktree" },
 ];
 
@@ -45,6 +48,9 @@ export const MACRO_MAP: Record<string, string> = {
   "/long": "This is a long running task, work tirelessly until you can verify that everything is complete and correct",
   "/diagnose": "Can you pinpoint the exact cause and tell me your diagnosis?",
   "/quality": "Give your changes a code quality assesment. Is there anything that should be split off into other files, de-duplicated, or made more clear?",
+  "/qutebrowser": `You have access to qutebrowser through the qb CLI tool (IN YOUR PATH, source at ~/Workspace/qutebrowser-cli/). Run qb -h for usage reference.`,
+  "/gmail": `You have access to my gmail through the gmail CLI tool (IN YOUR PATH, source at ~/Workspace/gmail-cli) Run gmail -h for usage reference.`,
+  "/twitter": `You have access to Twitter/X through the twitter CLI tool (IN YOUR PATH, source at /Workspace/twitter/). Run twitter -h for usage reference.`,
   "/worktree": "Work in a git worktree for this task. Create it with `git worktree add .worktrees/<name> -b <name> HEAD` from the repo root. When I say I'm satisfied, merge back to main and clean up: run `git worktree remove .worktrees/<name>`, delete the branch with `git branch -d <name>`, and remove the leftover config dirs `~/.config/exocortex/runtime/<name>/` and `~/.config/exocortex/instances/<name>/`.",
   "/worktree merge": "Your work in your worktree is good. Merge back into main and clean up after yourself.",
 };
