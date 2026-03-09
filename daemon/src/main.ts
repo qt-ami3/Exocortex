@@ -9,26 +9,22 @@
  *   bun run src/main.ts login    Authenticate with Anthropic
  */
 
-import { join } from "path";
 import { mkdirSync, writeFileSync, readFileSync, unlinkSync, existsSync } from "fs";
 import { connect as netConnect } from "net";
 import { log } from "./log";
-import { loadAuth, isTokenExpired, CONFIG_DIR } from "./store";
+import { loadAuth, isTokenExpired } from "./store";
 import { DaemonServer } from "./server";
 import { createHandler } from "./handler";
 import { handleLogin } from "./cli";
 import * as convStore from "./conversations";
+import { socketPath, pidPath, runtimeDir, worktreeName } from "@exocortex/shared/paths";
 
 // ── Paths ───────────────────────────────────────────────────────────
 
-function runtimeDir(): string {
-  const dir = join(CONFIG_DIR, "runtime");
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
+mkdirSync(runtimeDir(), { recursive: true });
 
-const SOCKET_PATH = join(runtimeDir(), "exocortexd.sock");
-const PID_PATH = join(runtimeDir(), "exocortexd.pid");
+const SOCKET_PATH = socketPath();
+const PID_PATH = pidPath();
 
 // ── Singleton guard ─────────────────────────────────────────────────
 
@@ -98,7 +94,8 @@ async function startDaemon(): Promise<void> {
   const auth = loadAuth();
   const authOk = auth?.tokens?.accessToken && !isTokenExpired(auth.tokens);
 
-  console.log(`\n  exocortexd running (pid ${process.pid})`);
+  const wt = worktreeName();
+  console.log(`\n  exocortexd running (pid ${process.pid})${wt ? ` [worktree: ${wt}]` : ""}`);
   console.log(`  socket: ${SOCKET_PATH}`);
   console.log(`  auth:   ${authOk ? `✓ ${auth?.profile?.email ?? "authenticated"}` : "✗ not authenticated — run: bun run login"}`);
   console.log(`\n  Waiting for connections...\n`);

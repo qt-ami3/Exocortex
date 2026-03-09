@@ -10,7 +10,7 @@
 import { join } from "path";
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "fs";
 import { log } from "./log";
-import { CONFIG_DIR } from "./store";
+import { conversationsDir } from "@exocortex/shared/paths";
 import type { Conversation, StoredMessage, ApiMessage, ModelId, ConversationSummary } from "./messages";
 import { sortConversations } from "./messages";
 
@@ -201,7 +201,7 @@ function migrate(data: Record<string, unknown>): ConversationFile {
 
 // ── Paths ───────────────────────────────────────────────────────────
 
-const CONV_DIR = join(CONFIG_DIR, "conversations");
+const CONV_DIR = conversationsDir();
 
 function ensureDir(): void {
   if (!existsSync(CONV_DIR)) {

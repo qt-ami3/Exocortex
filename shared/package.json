@@ -4,9 +4,11 @@
   "type": "module",
   "exports": {
     "./messages": "./src/messages.ts",
-    "./protocol": "./src/protocol.ts"
+    "./protocol": "./src/protocol.ts",
+    "./paths": "./src/paths.ts"
   },
   "devDependencies": {
+    "@types/bun": "latest",
     "typescript": "^5.7"
   }
 }

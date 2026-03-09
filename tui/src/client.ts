@@ -6,17 +6,11 @@
 
 import { connect, type Socket } from "net";
 import { existsSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
 import type { Command, Event } from "./protocol";
 import type { ModelId } from "./messages";
+import { socketPath } from "@exocortex/shared/paths";
 
 export type EventHandler = (event: Event) => void;
-
-function defaultSocketPath(): string {
-  const xdg = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
-  return join(xdg, "exocortex", "runtime", "exocortexd.sock");
-}
 
 export class DaemonClient {
   private socket: Socket | null = null;
@@ -26,9 +20,9 @@ export class DaemonClient {
   private socketPath: string;
   private onDisconnect: (() => void) | null = null;
 
-  constructor(handler: EventHandler, socketPath?: string) {
+  constructor(handler: EventHandler, overrideSocketPath?: string) {
     this.handler = handler;
-    this.socketPath = socketPath ?? defaultSocketPath();
+    this.socketPath = overrideSocketPath ?? socketPath();
   }
 
   get connected(): boolean { return this._connected; }
