@@ -68,6 +68,8 @@ export interface RenderState {
   undo: UndoState;
   /** Autocomplete popup state (command or path completion). */
   autocomplete: AutocompleteState | null;
+  /** Scroll offset for the prompt input area (vim-style: only scrolls when cursor leaves viewport). */
+  promptScrollOffset: number;
 }
 
 /** Streaming state is derived from pendingAI — no separate boolean. */
@@ -102,6 +104,7 @@ export function createInitialState(): RenderState {
     historyLines: [],
     undo: createUndoState(),
     autocomplete: null,
+    promptScrollOffset: 0,
   };
   // App starts in insert mode — mark entry so first Esc commits the session
   markInsertEntry(s.undo, s.inputBuffer, s.cursorPos);
