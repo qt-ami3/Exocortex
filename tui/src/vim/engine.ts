@@ -384,7 +384,7 @@ function executeModeChange(
   let newCursor = cursor;
   if (context === "prompt") {
     switch (cmd.cursor) {
-      case "after": newCursor = Math.min(cursor + 1, buffer.length); break;
+      case "after": newCursor = Math.min(cursor + 1, lineEndOf(buffer, cursor)); break;
       case "bol":   newCursor = lineStartOf(buffer, cursor); break;
       case "eol":   newCursor = lineEndOf(buffer, cursor); break;
       // "before" or undefined: stay at current position
