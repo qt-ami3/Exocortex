@@ -124,8 +124,9 @@ export function render(state: RenderState): void {
   const maxInputWidth = chatW - promptLen;
   const maxInputRows = Math.min(10, Math.floor((rows - 6) / 2));
 
-  const { lines: inputLines, isNewLine, cursorLine, cursorCol } =
-    getInputLines(state.inputBuffer, state.cursorPos, maxInputWidth, maxInputRows);
+  const { lines: inputLines, isNewLine, cursorLine, cursorCol, scrollOffset: newPromptScroll } =
+    getInputLines(state.inputBuffer, state.cursorPos, maxInputWidth, maxInputRows, state.promptScrollOffset);
+  state.promptScrollOffset = newPromptScroll;
 
   const inputRowCount = inputLines.length;
 

@@ -155,6 +155,7 @@ export function handlePromptKey(state: RenderState, key: KeyEvent): "submit" | "
 export function clearPrompt(state: RenderState): void {
   state.inputBuffer = "";
   state.cursorPos = 0;
+  state.promptScrollOffset = 0;
   state.vim.mode = "insert";
   // Mark new insert session so subsequent typing is undoable
   markInsertEntry(state.undo, "", 0);
@@ -171,6 +172,8 @@ export interface InputLinesResult {
   cursorLine: number;
   /** Cursor column within its visible line. */
   cursorCol: number;
+  /** Updated scroll offset (persist this for the next call). */
+  scrollOffset: number;
 }
 
 /**
@@ -178,12 +181,17 @@ export interface InputLinesResult {
  * Long lines are broken at maxWidth (vim-style, no word boundaries).
  * Returns the visible slice (scrolled to keep cursor in view)
  * plus cursor position within that slice.
+ *
+ * Scrolling is vim-style: the viewport only moves when the cursor
+ * would leave the visible area (top or bottom), not on every movement.
+ * Pass the previous scrollOffset to preserve the viewport position.
  */
 export function getInputLines(
   buffer: string,
   cursorPos: number,
   maxWidth: number,
   maxRows: number,
+  prevScrollOffset: number = 0,
 ): InputLinesResult {
   // Guard against zero/negative width — would cause infinite loop in hard-wrap
   if (maxWidth < 1) maxWidth = 1;
@@ -250,18 +258,32 @@ export function getInputLines(
       isNewLine: isNewLineArr,
       cursorLine: cursorWrappedLine,
       cursorCol: cursorColInLine,
+      scrollOffset: 0,
     };
   }
 
-  // Cursor-following scroll
-  let scrollStart = Math.max(0, cursorWrappedLine - maxRows + 1);
-  // Don't scroll past the end
-  scrollStart = Math.min(scrollStart, wrapped.length - maxRows);
+  // Vim-style scroll: keep previous offset, only adjust when cursor
+  // would leave the visible area.
+  let scrollStart = prevScrollOffset;
+
+  // Clamp to valid range first
+  const maxScroll = wrapped.length - maxRows;
+  scrollStart = Math.max(0, Math.min(scrollStart, maxScroll));
+
+  // Cursor above viewport → scroll up so cursor is at the top
+  if (cursorWrappedLine < scrollStart) {
+    scrollStart = cursorWrappedLine;
+  }
+  // Cursor below viewport → scroll down so cursor is at the bottom
+  else if (cursorWrappedLine >= scrollStart + maxRows) {
+    scrollStart = cursorWrappedLine - maxRows + 1;
+  }
 
   return {
     lines: wrapped.slice(scrollStart, scrollStart + maxRows),
     isNewLine: isNewLineArr.slice(scrollStart, scrollStart + maxRows),
     cursorLine: cursorWrappedLine - scrollStart,
     cursorCol: cursorColInLine,
+    scrollOffset: scrollStart,
   };
 }
