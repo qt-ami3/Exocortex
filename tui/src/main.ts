@@ -13,6 +13,7 @@ import { parseKeys, type KeyEvent } from "./input";
 import { handleFocusedKey } from "./focus";
 import { clearPrompt } from "./promptline";
 import { tryCommand } from "./commands";
+import { expandMacros } from "./macros";
 import { render } from "./render";
 import { enter_alt, leave_alt, hide_cursor, show_cursor, enable_bracketed_paste, disable_bracketed_paste } from "./terminal";
 import { createInitialState, isStreaming } from "./state";
@@ -87,7 +88,8 @@ function handleSubmit(): void {
     return;
   }
 
-  // Regular message
+  // Regular message — expand macros before sending
+  const messageText = expandMacros(text);
   clearPrompt(state);
   state.scrollOffset = 0;
 
@@ -99,16 +101,16 @@ function handleSubmit(): void {
 
   // Create the AI message immediately so the timer starts now
   const startedAt = Date.now();
-  state.messages.push({ role: "user", text, metadata: null });
+  state.messages.push({ role: "user", text: messageText, metadata: null });
   state.pendingAI = createPendingAI(startedAt, state.model);
 
   // If no conversation yet, create one first
   if (!state.convId) {
     state.pendingSend.active = true;
-    state.pendingSend.text = text;
+    state.pendingSend.text = messageText;
     daemon.createConversation(state.model);
   } else {
-    daemon.sendMessage(state.convId, text, startedAt);
+    daemon.sendMessage(state.convId, messageText, startedAt);
   }
 
   scheduleRender();
