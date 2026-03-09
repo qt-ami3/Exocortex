@@ -8,12 +8,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { randomBytes, createHash } from "crypto";
 import { log } from "./log";
+import { ANTHROPIC_BASE_URL } from "./constants";
 import type { StoredTokens, OAuthProfile } from "./store";
 
 // ── Constants (matching Claude Code) ────────────────────────────────
 
 const CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
-const BASE_API_URL = "https://api.anthropic.com";
 const CLAUDEAI_AUTHORIZE_URL = "https://claude.ai/oauth/authorize";
 const TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
 const SUCCESS_URL = "https://platform.claude.com/oauth/code/success?app=claude-code";
@@ -158,7 +158,7 @@ interface RolesResponse {
 
 async function fetchProfile(accessToken: string): Promise<ProfileResponse | null> {
   try {
-    const res = await fetch(`${BASE_API_URL}/api/oauth/profile`, {
+    const res = await fetch(`${ANTHROPIC_BASE_URL}/api/oauth/profile`, {
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     });
     return res.ok ? (res.json() as Promise<ProfileResponse>) : null;
@@ -167,7 +167,7 @@ async function fetchProfile(accessToken: string): Promise<ProfileResponse | null
 
 async function fetchRoles(accessToken: string): Promise<RolesResponse | null> {
   try {
-    const res = await fetch(`${BASE_API_URL}/api/oauth/claude_cli/roles`, {
+    const res = await fetch(`${ANTHROPIC_BASE_URL}/api/oauth/claude_cli/roles`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     return res.ok ? (res.json() as Promise<RolesResponse>) : null;
@@ -232,7 +232,7 @@ async function doRefresh(refreshToken: string): Promise<StoredTokens> {
 
 export async function verifyAuth(accessToken: string): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_API_URL}/api/oauth/claude_cli/client_data`, {
+    const res = await fetch(`${ANTHROPIC_BASE_URL}/api/oauth/claude_cli/client_data`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "anthropic-beta": "oauth-2025-04-20",

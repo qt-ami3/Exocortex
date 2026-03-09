@@ -11,6 +11,7 @@ import { join } from "path";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { log } from "./log";
 import { loadAuth, CONFIG_DIR } from "./store";
+import { ANTHROPIC_BASE_URL } from "./constants";
 import type { UsageData, UsageWindow } from "./messages";
 
 // ── Persistence ───────────────────────────────────────────────────
@@ -73,8 +74,6 @@ function scheduleResetRefresh(usage: UsageData, onUpdate: (u: UsageData) => void
 
 // ── Refresh (full API fetch) ───────────────────────────────────────
 
-const BASE_URL = "https://api.anthropic.com";
-
 /**
  * Fetch latest usage from the Anthropic API and cache it.
  * Calls onUpdate if new data is received.
@@ -100,7 +99,7 @@ export function refreshUsage(onUpdate: (usage: UsageData) => void): void {
 
 async function fetchUsage(accessToken: string): Promise<UsageData | null> {
   try {
-    const res = await fetch(`${BASE_URL}/api/oauth/usage`, {
+    const res = await fetch(`${ANTHROPIC_BASE_URL}/api/oauth/usage`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "anthropic-beta": "oauth-2025-04-20",

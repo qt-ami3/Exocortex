@@ -2,12 +2,12 @@
  * Credential storage for exocortexd.
  *
  * Reads/writes OAuth tokens to ~/.config/exocortex/credentials.json.
- * Falls back to ~/.mnemo/credentials.json for existing Mnemo users.
  */
 
 import { homedir } from "os";
 import { join } from "path";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
+import { log } from "./log";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -43,9 +43,6 @@ export interface StoredAuth {
 export const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "exocortex");
 const CRED_FILE = join(CONFIG_DIR, "credentials.json");
 
-// Mnemo fallback
-const MNEMO_CRED_FILE = join(homedir(), ".mnemo", "credentials.json");
-
 function ensureDir(): void {
   if (!existsSync(CONFIG_DIR)) {
     mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
@@ -60,13 +57,9 @@ export function saveAuth(auth: StoredAuth): void {
 }
 
 export function loadAuth(): StoredAuth | null {
-  // Try exocortex credentials first
   if (existsSync(CRED_FILE)) {
-    try { return JSON.parse(readFileSync(CRED_FILE, "utf-8")); } catch {}
-  }
-  // Fall back to Mnemo credentials
-  if (existsSync(MNEMO_CRED_FILE)) {
-    try { return JSON.parse(readFileSync(MNEMO_CRED_FILE, "utf-8")); } catch {}
+    try { return JSON.parse(readFileSync(CRED_FILE, "utf-8")); }
+    catch (err) { log("warn", `store: failed to parse ${CRED_FILE}: ${err}`); }
   }
   return null;
 }

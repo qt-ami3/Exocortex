@@ -10,14 +10,13 @@ import { loadAuth, isTokenExpired, saveAuth } from "./store";
 import { refreshTokens, AuthError } from "./auth";
 import { injectToolBreakpoints, injectMessageBreakpoints } from "./cache";
 import { log } from "./log";
+import { ANTHROPIC_BASE_URL } from "./constants";
 import type { ModelId, ApiMessage, ApiContentBlock } from "./messages";
 export type { ApiMessage, ApiContentBlock };
 
 export { AuthError };
 
 // ── Config ──────────────────────────────────────────────────────────
-
-const BASE_URL = "https://api.anthropic.com";
 const API_VERSION = "2023-06-01";
 // IMPORTANT: User-Agent, beta headers, and metadata.user_id must mirror Claude
 // Code exactly. The API uses these for request routing and priority — using a
@@ -144,7 +143,7 @@ function buildRequest(
   }
 
   return {
-    url: `${BASE_URL}/v1/messages?beta=true`,
+    url: `${ANTHROPIC_BASE_URL}/v1/messages?beta=true`,
     init: {
       method: "POST",
       headers: {
@@ -187,7 +186,8 @@ function finalizeBlock(
     }
   } else if (block.type === "tool_use") {
     let input: Record<string, unknown> = {};
-    try { if (block.inputJson) input = JSON.parse(block.inputJson); } catch {}
+    try { if (block.inputJson) input = JSON.parse(block.inputJson); }
+    catch { log("warn", `api: failed to parse tool input JSON for ${block.name}: ${block.inputJson.slice(0, 200)}`); }
     toolCalls.push({ id: block.id, name: block.name, input });
   }
 }

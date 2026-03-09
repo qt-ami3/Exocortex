@@ -10,6 +10,12 @@ import type { Block, MessageMetadata } from "./messages";
 import type { StoredMessage, ApiContentBlock } from "./messages";
 import type { ModelId } from "./messages";
 
+/** Minimal shape for content parts inside tool_result arrays. */
+interface ContentPart {
+  type: string;
+  text?: string;
+}
+
 // ── Types ──────────────────────────────────────────────────────────
 
 export type DisplayEntry =
@@ -67,11 +73,11 @@ export function buildDisplayData(
             summary: s.detail || s.label,
           });
         } else if (c.type === "tool_result") {
-          const raw = c.content as string | unknown[];
+          const raw = c.content as string | ContentPart[];
           const output = typeof raw === "string"
             ? raw
             : Array.isArray(raw)
-              ? (raw as any[]).filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n")
+              ? raw.filter((p) => p.type === "text").map((p) => p.text ?? "").join("\n")
               : String(raw ?? "");
           blocks.push({
             type: "tool_result",
@@ -95,7 +101,7 @@ export function buildDisplayData(
     }
     if (msg.role === "user") {
       if (typeof msg.content !== "string") {
-        const isToolResult = (msg.content as any[]).every((c: any) => c.type === "tool_result");
+        const isToolResult = (msg.content as ApiContentBlock[]).every((c) => c.type === "tool_result");
         if (isToolResult && currentAI) {
           currentAI.blocks.push(...extractBlocks(msg.content));
           continue;

@@ -148,7 +148,10 @@ export class DaemonClient {
       if (!line) continue;
       try {
         this.handler(JSON.parse(line) as Event);
-      } catch {}
+      } catch {
+        // Malformed event or handler error — log to stderr for debugging.
+        // Silent in production since the TUI owns stdout for rendering.
+      }
     }
   }
 }
