@@ -7,7 +7,7 @@
  */
 
 import type { Conversation, ModelId, ConversationSummary } from "./messages";
-import { createConversation, sortConversations } from "./messages";
+import { createConversation, sortConversations, displayName, extractPreview } from "./messages";
 import { buildDisplayData, type ConversationDisplayData } from "./display";
 import { summarizeTool } from "./tools/registry";
 import * as persistence from "./persistence";
@@ -59,6 +59,45 @@ export function bumpToTop(id: string): boolean {
   conv.sortOrder = topUnpinnedOrder(id);
   markDirty(id);
   return true;
+}
+
+/** Clone a conversation: deep-copy with a new ID, placed right after the original in sort order. */
+export function clone(id: string): Conversation | null {
+  const src = conversations.get(id);
+  if (!src) return null;
+
+  const newId = generateId();
+  const now = Date.now();
+
+  // Compute a sortOrder between the original and the item after it
+  const summaries = listSummaries();
+  const srcIdx = summaries.findIndex(s => s.id === id);
+  let newOrder: number;
+  if (srcIdx >= 0 && srcIdx + 1 < summaries.length && summaries[srcIdx + 1].pinned === src.pinned) {
+    // Place between the original and the next item in the same section
+    newOrder = (src.sortOrder + summaries[srcIdx + 1].sortOrder) / 2;
+  } else {
+    // Last item in its section — place after it
+    newOrder = src.sortOrder + 1;
+  }
+
+  const conv: Conversation = {
+    id: newId,
+    model: src.model,
+    messages: JSON.parse(JSON.stringify(src.messages)),
+    createdAt: now,
+    updatedAt: now,
+    lastContextTokens: src.lastContextTokens,
+    marked: src.marked,
+    pinned: src.pinned,
+    sortOrder: newOrder,
+    title: displayName(src) + " 📋",
+  };
+
+  conversations.set(newId, conv);
+  markDirty(newId);
+  flush(newId);
+  return conv;
 }
 
 export function get(id: string): Conversation | undefined {
@@ -222,19 +261,13 @@ export function move(id: string, direction: "up" | "down"): boolean {
 export function getSummary(id: string): ConversationSummary | null {
   const conv = conversations.get(id);
   if (!conv) return null;
-  const firstUserMsg = conv.messages.find(m => m.role === "user");
-  const preview = firstUserMsg
-    ? typeof firstUserMsg.content === "string"
-      ? firstUserMsg.content.slice(0, 80)
-      : ""
-    : "";
   return {
     id: conv.id,
     model: conv.model,
     createdAt: conv.createdAt,
     updatedAt: conv.updatedAt,
     messageCount: conv.messages.length,
-    preview,
+    preview: extractPreview(conv.messages),
     title: conv.title ?? null,
     marked: conv.marked,
     pinned: conv.pinned,
