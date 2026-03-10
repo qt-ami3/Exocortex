@@ -4,10 +4,10 @@
  * Reads/writes OAuth tokens to ~/.config/exocortex/credentials.json.
  */
 
-import { homedir } from "os";
 import { join } from "path";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
 import { log } from "./log";
+import { configDir } from "@exocortex/shared/paths";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -39,8 +39,7 @@ export interface StoredAuth {
 
 // ── Paths ───────────────────────────────────────────────────────────
 
-/** Base config directory for exocortex (~/.config/exocortex). */
-export const CONFIG_DIR = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "exocortex");
+const CONFIG_DIR = configDir();
 const CRED_FILE = join(CONFIG_DIR, "credentials.json");
 
 function ensureDir(): void {

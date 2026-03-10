@@ -10,13 +10,14 @@
 import { join } from "path";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { log } from "./log";
-import { loadAuth, CONFIG_DIR } from "./store";
+import { loadAuth } from "./store";
+import { configDir } from "@exocortex/shared/paths";
 import { ANTHROPIC_BASE_URL } from "./constants";
 import type { UsageData, UsageWindow } from "./messages";
 
 // ── Persistence ───────────────────────────────────────────────────
 
-const USAGE_FILE = join(CONFIG_DIR, "usage.json");
+const USAGE_FILE = join(configDir(), "usage.json");
 
 function loadFromDisk(): UsageData | null {
   try {

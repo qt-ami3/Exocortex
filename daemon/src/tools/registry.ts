@@ -7,6 +7,7 @@
 import type { Tool, ToolResult, ToolSummary } from "./types";
 import type { ToolDisplayInfo } from "@exocortex/shared/messages";
 import type { ApiToolCall } from "../api";
+import type { ToolExecResult } from "../agent";
 import { bash } from "./bash";
 import { read } from "./read";
 import { write } from "./write";
@@ -68,37 +69,25 @@ export function summarizeTool(name: string, input: Record<string, unknown>): Too
 
 // ── Build executor (injected into the agent loop) ──────────────────
 
-export interface ExecResult {
-  toolCallId: string;
-  toolName: string;
-  output: string;
-  isError: boolean;
-  image?: { mediaType: string; base64: string };
-}
-
-export function buildExecutor(): (calls: ApiToolCall[]) => Promise<ExecResult[]> {
-  return async (calls) => {
-    const results: ExecResult[] = [];
-    for (const call of calls) {
-      const tool = toolMap.get(call.name);
-      let result: ToolResult;
-      if (!tool) {
-        result = { output: `Unknown tool: ${call.name}`, isError: true };
-      } else {
-        try {
-          result = await tool.execute(call.input);
-        } catch (err) {
-          result = { output: `Tool error: ${err instanceof Error ? err.message : String(err)}`, isError: true };
-        }
+export function buildExecutor(): (calls: ApiToolCall[]) => Promise<ToolExecResult[]> {
+  return (calls) => Promise.all(calls.map(async (call): Promise<ToolExecResult> => {
+    const tool = toolMap.get(call.name);
+    let result: ToolResult;
+    if (!tool) {
+      result = { output: `Unknown tool: ${call.name}`, isError: true };
+    } else {
+      try {
+        result = await tool.execute(call.input);
+      } catch (err) {
+        result = { output: `Tool error: ${err instanceof Error ? err.message : String(err)}`, isError: true };
       }
-      results.push({
-        toolCallId: call.id,
-        toolName: call.name,
-        output: result.output,
-        isError: result.isError,
-        image: result.image,
-      });
     }
-    return results;
-  };
+    return {
+      toolCallId: call.id,
+      toolName: call.name,
+      output: result.output,
+      isError: result.isError,
+      image: result.image,
+    };
+  }));
 }
