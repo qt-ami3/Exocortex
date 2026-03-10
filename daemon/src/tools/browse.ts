@@ -1,13 +1,15 @@
 /**
  * Browse tool — fetch and read web pages.
  *
- * Fetches a URL, converts HTML to markdown, caches results for
- * 15 minutes. Returns raw content for the main model to interpret.
+ * Fetches a URL, converts HTML to markdown, then passes the content
+ * through an inner LLM call (sonnet) to produce a focused summary
+ * with relevant links preserved. Caches raw fetches for 15 minutes.
  * Handles HTML, JSON, and plain text content types.
  */
 
 import type { Tool, ToolResult, ToolSummary } from "./types";
 import { cap } from "./util";
+import { complete } from "../llm";
 import { log } from "../log";
 
 // ── Constants ──────────────────────────────────────────────────────
@@ -105,6 +107,43 @@ function htmlToMarkdown(html: string): string {
   return text.trim();
 }
 
+// ── LLM summarization ─────────────────────────────────────────────
+
+const SUMMARIZE_SYSTEM = [
+  "You are a web page summarizer. You receive the markdown content of a web page and a user prompt describing what they're looking for.",
+  "Your job:",
+  "- Produce a clear, focused summary that addresses the user's prompt.",
+  "- Preserve all relevant URLs as markdown links — the reader needs them to navigate.",
+  "- If the page contains code snippets relevant to the prompt, include them.",
+  "- Omit navigation boilerplate, ads, cookie banners, and other noise.",
+  "- Keep the summary concise but complete. Don't omit important details.",
+  "- Output markdown.",
+].join("\n");
+
+async function summarizeContent(url: string, markdown: string, prompt?: string): Promise<string> {
+  const userMessage = prompt
+    ? `URL: ${url}\nLooking for: ${prompt}\n\n---\n\n${markdown}`
+    : `URL: ${url}\nProvide a general summary.\n\n---\n\n${markdown}`;
+
+  try {
+    log("info", `browse: summarizing ${url} (${markdown.length} chars) with sonnet`);
+    const result = await complete(SUMMARIZE_SYSTEM, userMessage, {
+      model: "sonnet",
+      maxTokens: 8192,
+    });
+    log("info", `browse: summary done (${result.text.length} chars, in=${result.inputTokens ?? "?"}, out=${result.outputTokens ?? "?"})`);
+    return `Summary of ${url}:\n\n${result.text}`;
+  } catch (err) {
+    // If the inner LLM call fails, fall back to raw content
+    const msg = err instanceof Error ? err.message : String(err);
+    log("warn", `browse: summarization failed (${msg}), returning raw content`);
+    const header = prompt
+      ? `Content from ${url} (looking for: ${prompt}):\n\n`
+      : `Content from ${url}:\n\n`;
+    return header + markdown;
+  }
+}
+
 // ── Execution ──────────────────────────────────────────────────────
 
 async function executeBrowse(input: Record<string, unknown>): Promise<ToolResult> {
@@ -188,12 +227,9 @@ async function executeBrowse(input: Record<string, unknown>): Promise<ToolResult
       return { output: "The page returned no content.", isError: false };
     }
 
-    // Prepend the prompt context if provided
-    const header = prompt
-      ? `Content from ${fetchUrl} (looking for: ${prompt}):\n\n`
-      : `Content from ${fetchUrl}:\n\n`;
-
-    return { output: cap(header + markdown), isError: false };
+    // ── Summarize through sonnet ───────────────────────────────
+    const summary = await summarizeContent(fetchUrl, markdown, prompt);
+    return { output: cap(summary), isError: false };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log("error", `browse: ${msg}`);
