@@ -14,14 +14,10 @@
 
 import { readFileSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
 import { log } from "./log";
+import { configDir } from "@exocortex/shared/paths";
 
-const ENV_PATH = join(
-  process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
-  "exocortex",
-  "env",
-);
+const ENV_PATH = join(configDir(), "env");
 
 export function loadEnvFile(): void {
   let content: string;
