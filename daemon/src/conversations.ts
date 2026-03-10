@@ -91,7 +91,7 @@ export function clone(id: string): Conversation | null {
     marked: src.marked,
     pinned: src.pinned,
     sortOrder: newOrder,
-    title: src.title ? src.title + " (copy)" : null,
+    title: src.title ? src.title + " 📋" : null,
   };
 
   conversations.set(newId, conv);
