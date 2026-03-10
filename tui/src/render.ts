@@ -519,7 +519,6 @@ function renderEditMessageOverlay(
   let result = "";
 
   const titleLine = "Edit message:";
-  const hintLine = "j/k ↑/↓  enter  esc";
 
   // Build display lines: truncated previews of each item
   const maxPreviewLen = Math.min(50, chatW - 12);
@@ -537,7 +536,6 @@ function renderEditMessageOverlay(
   });
   const maxContentLen = Math.max(
     titleLine.length,
-    hintLine.length,
     ...plainItemLines.map(l => l.length),
   );
   const innerWidth = Math.min(maxContentLen + 4, chatW - 4);
@@ -553,8 +551,8 @@ function renderEditMessageOverlay(
   scrollStart = Math.max(0, Math.min(scrollStart, em.items.length - maxVisible));
   em.scrollOffset = scrollStart;
 
-  // Content: title, blank, visible items, blank, hint
-  const contentLines: { text: string; plain: string; style: "title" | "hint" | "item" | "blank"; itemIdx?: number }[] = [];
+  // Content: title, blank, visible items
+  const contentLines: { text: string; plain: string; style: "title" | "item" | "blank"; itemIdx?: number }[] = [];
   contentLines.push({ text: titleLine, plain: titleLine, style: "title" });
   contentLines.push({ text: "", plain: "", style: "blank" });
   for (let vi = 0; vi < maxVisible; vi++) {
@@ -567,8 +565,6 @@ function renderEditMessageOverlay(
       itemIdx: i,
     });
   }
-  contentLines.push({ text: "", plain: "", style: "blank" });
-  contentLines.push({ text: hintLine, plain: hintLine, style: "hint" });
 
   // Position: centered horizontally, anchored above input separator
   const boxLeft = chatCol + Math.floor((chatW - boxWidth) / 2);
@@ -591,8 +587,6 @@ function renderEditMessageOverlay(
 
     if (cl.style === "title") {
       fg = theme.text;
-    } else if (cl.style === "hint") {
-      fg = theme.muted;
     } else if (cl.style === "item") {
       const isSelected = cl.itemIdx === em.selection;
       if (isSelected) {
