@@ -20,6 +20,21 @@ import type { UndoState } from "./undo";
 import { createUndoState, markInsertEntry } from "./undo";
 import type { AutocompleteState } from "./autocomplete";
 
+// ── Queue types ────────────────────────────────────────────────────
+
+export type QueueTiming = "next-turn" | "message-end";
+
+export interface QueuedMessage {
+  convId: string;
+  text: string;
+  timing: QueueTiming;
+}
+
+export interface QueuePromptState {
+  text: string;            // the message text being queued
+  selection: QueueTiming;  // which option is highlighted
+}
+
 /** Cached layout values — set by the renderer, read by scroll functions. */
 export interface LayoutCache {
   totalLines: number;      // total rendered message lines
@@ -75,6 +90,10 @@ export interface RenderState {
   autocomplete: AutocompleteState | null;
   /** Scroll offset for the prompt input area (vim-style: only scrolls when cursor leaves viewport). */
   promptScrollOffset: number;
+  /** Queue prompt overlay — non-null when the modal is showing. */
+  queuePrompt: QueuePromptState | null;
+  /** Messages queued for delivery at a specific timing. */
+  queuedMessages: QueuedMessage[];
 }
 
 /** Streaming state is derived from pendingAI — no separate boolean. */
@@ -112,6 +131,8 @@ export function createInitialState(): RenderState {
     undo: createUndoState(),
     autocomplete: null,
     promptScrollOffset: 0,
+    queuePrompt: null,
+    queuedMessages: [],
   };
   // App starts in insert mode — mark entry so first Esc commits the session
   markInsertEntry(s.undo, s.inputBuffer, s.cursorPos);

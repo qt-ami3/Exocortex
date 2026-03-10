@@ -18,6 +18,8 @@ import { clampCursor, stripAnsi, contentBounds, logicalLineRange } from "./histo
 import { renderLineWithCursor, renderLineWithSelection } from "./cursorrender";
 import { highlightPromptInput } from "./promptHighlight";
 
+import type { QueuePromptState } from "./state";
+
 // ── ANSI positioning (non-color escapes) ────────────────────────────
 
 const ESC = "\x1b[";
@@ -358,6 +360,11 @@ export function render(state: RenderState): void {
     out.push(move_to(row, chatCol) + statusLines[i]);
   }
 
+  // ── Queue prompt overlay ───────────────────────────────────────
+  if (state.queuePrompt) {
+    out.push(renderQueuePromptOverlay(state.queuePrompt, chatW, chatCol, sepAbove));
+  }
+
   // ── Cursor ─────────────────────────────────────────────────────
   if (promptFocused) {
     const cursorScreenRow = firstInputRow + cursorLine;
@@ -375,4 +382,78 @@ export function render(state: RenderState): void {
   }
 
   process.stdout.write(out.join(""));
+}
+
+// ── Queue prompt overlay ───────────────────────────────────────────
+
+function renderQueuePromptOverlay(
+  qp: QueuePromptState,
+  chatW: number,
+  chatCol: number,
+  sepRow: number,
+): string {
+  let result = "";
+
+  // Preview of the message being queued (truncated)
+  const preview = qp.text.replace(/\n/g, " ").slice(0, 40);
+  const previewLabel = preview.length < qp.text.replace(/\n/g, " ").length ? preview + "…" : preview;
+
+  // Box content lines
+  const titleLine = "Queue message:";
+  const msgLine = `"${previewLabel}"`;
+  const optLine1 = `${qp.selection === "next-turn" ? "▸ " : "  "}next turn`;
+  const optLine2 = `${qp.selection === "message-end" ? "▸ " : "  "}message end`;
+  const contentLines = [titleLine, msgLine, "", optLine1, optLine2];
+  const innerWidth = Math.min(
+    Math.max(...contentLines.map(l => l.length)) + 4,
+    chatW - 4,
+  );
+  const boxWidth = innerWidth + 2; // +2 for borders
+
+  // Position: centered horizontally in chat area, just above input separator
+  const boxLeft = chatCol + Math.floor((chatW - boxWidth) / 2);
+  const boxTop = Math.max(3, sepRow - contentLines.length - 2);
+
+  // Top border
+  result += move_to(boxTop, boxLeft);
+  result += `${theme.sidebarBg}${theme.accent}┌${"─".repeat(innerWidth)}┐${theme.reset}`;
+
+  // Content lines
+  for (let i = 0; i < contentLines.length; i++) {
+    const row = boxTop + 1 + i;
+    if (row >= sepRow) break; // don't overlap input area
+    const line = contentLines[i];
+    const padRight = Math.max(0, innerWidth - line.length);
+
+    let fg = theme.dim;
+    let bg = theme.sidebarBg;
+    if (i === 0) fg = theme.text;   // title
+    if (i === 1) fg = theme.dim;    // preview
+
+    if (i === 3 || i === 4) {
+      // Options
+      const isSelected = (i === 3 && qp.selection === "next-turn") ||
+                         (i === 4 && qp.selection === "message-end");
+      if (isSelected) {
+        bg = theme.sidebarSelBg;
+        fg = theme.accent;
+      } else {
+        fg = theme.text;
+      }
+    }
+
+    result += move_to(row, boxLeft);
+    result += `${theme.sidebarBg}${theme.accent}│${bg}${fg}`;
+    result += `${line}${" ".repeat(padRight)}`;
+    result += `${theme.sidebarBg}${theme.accent}│${theme.reset}`;
+  }
+
+  // Bottom border
+  const bottomRow = boxTop + 1 + contentLines.length;
+  if (bottomRow < sepRow) {
+    result += move_to(bottomRow, boxLeft);
+    result += `${theme.sidebarBg}${theme.accent}└${"─".repeat(innerWidth)}┘${theme.reset}`;
+  }
+
+  return result;
 }

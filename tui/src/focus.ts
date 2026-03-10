@@ -35,6 +35,7 @@ import {
 } from "./historycursor";
 import { handleMessageTextObject } from "./vim/message";
 import { dismissAutocomplete } from "./autocomplete";
+import { handleQueuePromptKey } from "./queue";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -52,11 +53,21 @@ export type KeyResult =
   | { type: "pin_conversation"; convId: string; pinned: boolean }
   | { type: "move_conversation"; convId: string; direction: "up" | "down" }
   | { type: "clone_conversation"; convId: string }
-  | { type: "new_conversation" };
+  | { type: "new_conversation" }
+  | { type: "queue_confirm" }
+  | { type: "queue_cancel" };
 
 // ── Key routing ─────────────────────────────────────────────────────
 
 export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
+  // ── Queue prompt modal — intercept all keys when showing ──────
+  if (state.queuePrompt) {
+    const qr = handleQueuePromptKey(key, state);
+    if (qr.type === "confirm") return { type: "queue_confirm" };
+    if (qr.type === "cancel")  return { type: "queue_cancel" };
+    return { type: "handled" };
+  }
+
   // Bracketed paste — insert directly into prompt buffer, newlines preserved
   if (key.type === "paste" && key.text) {
     // Normalize line endings: \r\n → \n, stray \r → \n

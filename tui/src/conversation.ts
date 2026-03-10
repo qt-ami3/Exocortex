@@ -209,6 +209,23 @@ export function buildMessageLines(
     }
   }
 
+  // Queued messages — dimmed user bubbles with timing label
+  if (state.convId) {
+    const queued = state.queuedMessages.filter(qm => qm.convId === state.convId);
+    for (const qm of queued) {
+      const timingLabel = qm.timing === "next-turn" ? "queued: next turn" : "queued: message end";
+      pushLine("");
+      // Render a dimmed user bubble
+      const qr = renderUserMessage(qm.text, availableWidth);
+      for (let i = 0; i < qr.lines.length; i++) {
+        pushLine(`${theme.dim}${qr.lines[i]}${theme.reset}`);
+      }
+      // Timing label — right-aligned, dim italic
+      const labelPad = " ".repeat(Math.max(0, availableWidth - timingLabel.length - 3));
+      pushLine(`${labelPad}${theme.dim}${theme.italic}${timingLabel}${theme.reset}`);
+    }
+  }
+
   // Currently streaming AI message — no margins
   if (state.pendingAI) {
     const start = lines.length;

@@ -19,6 +19,7 @@ import { enter_alt, leave_alt, hide_cursor, show_cursor, enable_bracketed_paste,
 import { createInitialState, isStreaming } from "./state";
 import { createPendingAI } from "./messages";
 import { handleEvent } from "./events";
+import { confirmQueueMessage, cancelQueuePrompt, drainQueuedMessages } from "./queue";
 import { theme } from "./theme";
 import type { Event } from "./protocol";
 
@@ -59,6 +60,22 @@ function onDaemonEvent(event: Event): void {
   // Clear stream tick on streaming_stopped
   if (event.type === "streaming_stopped") {
     if (streamTickTimer) { clearTimeout(streamTickTimer); streamTickTimer = null; }
+
+    // Drain queued messages — both timings fire on streaming_stopped
+    if (state.convId && event.convId === state.convId) {
+      const drained = drainQueuedMessages(state, state.convId);
+      if (drained.length > 0) {
+        // Send the first queued message; if there are more, they'll be
+        // drained on the next streaming_stopped cycle
+        const first = drained[0];
+        // Re-queue the rest for later
+        for (let i = 1; i < drained.length; i++) {
+          state.queuedMessages.push(drained[i]);
+        }
+        state.scrollOffset = 0;
+        sendDirectly(first.text);
+      }
+    }
   }
 
   scheduleRender();
@@ -90,21 +107,28 @@ function handleSubmit(): void {
 
   // Regular message — expand macros before sending
   const messageText = expandMacros(text);
-  clearPrompt(state);
-  state.scrollOffset = 0;
 
   if (isStreaming(state)) {
-    state.messages.push({ role: "system", text: "Still streaming — wait or press Escape to abort.", metadata: null });
+    // Show queue prompt overlay — let user choose when to send
+    state.queuePrompt = {
+      text: messageText,
+      selection: "next-turn",
+    };
     scheduleRender();
     return;
   }
 
-  // Create the AI message immediately so the timer starts now
+  clearPrompt(state);
+  state.scrollOffset = 0;
+  sendDirectly(messageText);
+}
+
+/** Send a message immediately (no streaming in progress). */
+function sendDirectly(messageText: string): void {
   const startedAt = Date.now();
   state.messages.push({ role: "user", text: messageText, metadata: null });
   state.pendingAI = createPendingAI(startedAt, state.model);
 
-  // If no conversation yet, create one first
   if (!state.convId) {
     state.pendingSend.active = true;
     state.pendingSend.text = messageText;
@@ -123,6 +147,18 @@ function handleKey(key: KeyEvent): void {
     case "submit":
       handleSubmit();
       return;
+    case "queue_confirm": {
+      const qr = confirmQueueMessage(state);
+      if (qr.direct) {
+        clearPrompt(state);
+        state.scrollOffset = 0;
+        sendDirectly(qr.text);
+      }
+      break;
+    }
+    case "queue_cancel":
+      cancelQueuePrompt(state);
+      break;
     case "quit":
       running = false;
       break;
