@@ -1,9 +1,10 @@
 /**
  * Auto-generate conversation titles via Haiku.
  *
- * Extracts the first user message, sends it to the daemon's
- * llm_complete endpoint, and renames the conversation with
- * the result. Called when `/rename` is used with no arguments.
+ * Collects all user messages from the conversation and sends them
+ * to the daemon's llm_complete endpoint so the title reflects the
+ * full scope of the conversation. Called when `/rename` is used
+ * with no arguments — can be re-run when the topic shifts.
  */
 
 import type { DaemonClient } from "./client";
@@ -19,6 +20,26 @@ exo bash truncate, exo code qa, berlin airbnb, tokens bug, context tool, unbrick
 // text response is empty.
 const MAX_TOKENS = 10200;
 
+/** Max characters of user message context to send for title generation. */
+const MAX_CONTEXT_CHARS = 2000;
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+/** Collect user messages into a single string, truncated to MAX_CONTEXT_CHARS. */
+function extractUserContext(state: RenderState): string {
+  const parts: string[] = [];
+  let total = 0;
+  for (const msg of state.messages) {
+    if (msg.role !== "user" || !("text" in msg)) continue;
+    const text = msg.text;
+    const remaining = MAX_CONTEXT_CHARS - total;
+    if (remaining <= 0) break;
+    parts.push(text.slice(0, remaining));
+    total += text.length;
+  }
+  return parts.join("\n\n");
+}
+
 // ── Public API ─────────────────────────────────────────────────────
 
 export function generateTitle(
@@ -27,8 +48,7 @@ export function generateTitle(
   daemon: DaemonClient,
   scheduleRender: () => void,
 ): void {
-  const firstUser = state.messages.find(m => m.role === "user");
-  const prompt = firstUser && "text" in firstUser ? firstUser.text.slice(0, 500) : "";
+  const prompt = extractUserContext(state);
 
   daemon.llmComplete(
     SYSTEM,
