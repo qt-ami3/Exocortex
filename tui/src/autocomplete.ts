@@ -34,6 +34,30 @@ export interface AutocompleteState {
   matches: CompletionItem[];
 }
 
+// ── Argument matching helper ─────────────────────────────────────
+
+/** Escape a string for use in a RegExp. */
+function escapeRegex(s: string): string {
+  return s.replace(/[/\\^$*+?.()|[\]{}]/g, "\\$&");
+}
+
+/**
+ * Try to match argument completion against a registry.
+ * If `raw` matches "/command arg…" for any entry in `registry`,
+ * returns the filtered argument completions. Otherwise returns null.
+ */
+function matchArgCompletion(
+  raw: string,
+  registry: Record<string, CompletionItem[]>,
+): CompletionItem[] | null {
+  for (const [cmd, args] of Object.entries(registry)) {
+    const re = new RegExp(`^${escapeRegex(cmd)}\\s+(.*)$`, "i");
+    const m = raw.match(re);
+    if (m) return args.filter(a => a.name.toLowerCase().startsWith(m[1].toLowerCase()));
+  }
+  return null;
+}
+
 // ── Command + macro matching ──────────────────────────────────────
 
 /**
@@ -44,19 +68,9 @@ function getCommandMatches(input: string): CompletionItem[] {
   const raw = input.trimStart();
   if (!raw.startsWith("/")) return [];
 
-  // Command argument completion: "/model son", "/convo co", etc.
-  for (const [cmd, args] of Object.entries(COMMAND_ARGS)) {
-    const re = new RegExp(`^${cmd.replace(/[/\\^$*+?.()|[\]{}]/g, "\\$&")}\\s+(.*)$`, "i");
-    const m = raw.match(re);
-    if (m) return args.filter(a => a.name.toLowerCase().startsWith(m[1].toLowerCase()));
-  }
-
-  // Macro argument completion: "/commit m" → match args for /commit
-  for (const [cmd, args] of Object.entries(MACRO_ARGS)) {
-    const re = new RegExp(`^${cmd.replace(/[/\\^$*+?.()|[\]{}]/g, "\\$&")}\\s+(.*)$`, "i");
-    const m = raw.match(re);
-    if (m) return args.filter(a => a.name.toLowerCase().startsWith(m[1].toLowerCase()));
-  }
+  // Argument completion against both command and macro registries
+  const argMatch = matchArgCompletion(raw, COMMAND_ARGS) ?? matchArgCompletion(raw, MACRO_ARGS);
+  if (argMatch) return argMatch;
 
   const prefix = raw.toLowerCase();
   const combined = [...COMMAND_LIST, ...MACRO_LIST];
@@ -71,15 +85,33 @@ function getMacroMatches(token: string): CompletionItem[] {
   const raw = token.trimStart();
   if (!raw.startsWith("/")) return [];
 
-  // Macro argument completion: "/commit m" → match args for /commit
-  for (const [cmd, args] of Object.entries(MACRO_ARGS)) {
-    const re = new RegExp(`^${cmd.replace(/[/\\^$*+?.()|[\]{}]/g, "\\$&")}\\s+(.*)$`, "i");
-    const m = raw.match(re);
-    if (m) return args.filter(a => a.name.toLowerCase().startsWith(m[1].toLowerCase()));
-  }
+  const argMatch = matchArgCompletion(raw, MACRO_ARGS);
+  if (argMatch) return argMatch;
 
   const prefix = raw.toLowerCase();
   return MACRO_LIST.filter(c => c.name.startsWith(prefix));
+}
+
+// ── Token scanning ────────────────────────────────────────────────
+
+/** Check if a character is whitespace (space, newline, tab). */
+function isWS(ch: string): boolean {
+  return ch === " " || ch === "\n" || ch === "\t";
+}
+
+/**
+ * Scan backwards from `pos` to find the start of the current token.
+ * A token is delimited by whitespace (space, newline, tab) or input start.
+ */
+function tokenStart(input: string, pos: number): number {
+  let start = pos;
+  while (start > 0 && !isWS(input[start - 1])) start--;
+  return start;
+}
+
+/** Check if `pos` is at a word boundary (start of input or preceded by whitespace). */
+function atWordBoundary(input: string, pos: number): boolean {
+  return pos === 0 || isWS(input[pos - 1]);
 }
 
 // ── Slash token extraction ────────────────────────────────────────
@@ -99,27 +131,16 @@ function extractSlashToken(
   input: string,
   cursorPos: number,
 ): { token: string; start: number } | null {
-  // Scan backwards from cursor to whitespace or start
-  let start = cursorPos;
-  while (start > 0 && input[start - 1] !== " " && input[start - 1] !== "\n" && input[start - 1] !== "\t") {
-    start--;
-  }
+  const start = tokenStart(input, cursorPos);
   const token = input.slice(start, cursorPos);
 
   if (token.length === 0) {
     // Cursor is right after whitespace — check if previous word is a /command.
     // This handles "text /commit |" → token="/commit " so arg completion activates.
     if (cursorPos > 0 && input[cursorPos - 1] === " ") {
-      let cmdStart = cursorPos - 1;
-      while (cmdStart > 0 && input[cmdStart - 1] !== " " && input[cmdStart - 1] !== "\n" && input[cmdStart - 1] !== "\t") {
-        cmdStart--;
-      }
+      const cmdStart = tokenStart(input, cursorPos - 1);
       const prevWord = input.slice(cmdStart, cursorPos - 1);
-      if (prevWord.startsWith("/")) {
-        if (cmdStart > 0) {
-          const prev = input[cmdStart - 1];
-          if (prev !== " " && prev !== "\n" && prev !== "\t") return null;
-        }
+      if (prevWord.startsWith("/") && atWordBoundary(input, cmdStart)) {
         return { token: input.slice(cmdStart, cursorPos), start: cmdStart };
       }
     }
@@ -127,27 +148,15 @@ function extractSlashToken(
   }
 
   if (token.startsWith("/")) {
-    // Must be at a word boundary (start of input or after whitespace)
-    if (start > 0) {
-      const prev = input[start - 1];
-      if (prev !== " " && prev !== "\n" && prev !== "\t") return null;
-    }
+    if (!atWordBoundary(input, start)) return null;
     return { token, start };
   }
 
   // Token doesn't start with / — look back one more word for "/command arg"
   if (start > 0 && input[start - 1] === " ") {
-    let cmdStart = start - 1;
-    while (cmdStart > 0 && input[cmdStart - 1] !== " " && input[cmdStart - 1] !== "\n" && input[cmdStart - 1] !== "\t") {
-      cmdStart--;
-    }
+    const cmdStart = tokenStart(input, start - 1);
     const prevWord = input.slice(cmdStart, start - 1);
-    if (prevWord.startsWith("/")) {
-      // Word boundary check for the /command
-      if (cmdStart > 0) {
-        const prev = input[cmdStart - 1];
-        if (prev !== " " && prev !== "\n" && prev !== "\t") return null;
-      }
+    if (prevWord.startsWith("/") && atWordBoundary(input, cmdStart)) {
       return { token: input.slice(cmdStart, cursorPos), start: cmdStart };
     }
   }
@@ -345,10 +354,7 @@ function extractPathToken(
   input: string,
   cursorPos: number,
 ): { token: string; start: number } | null {
-  let start = cursorPos;
-  while (start > 0 && input[start - 1] !== " " && input[start - 1] !== "\n" && input[start - 1] !== "\t") {
-    start--;
-  }
+  const start = tokenStart(input, cursorPos);
   const token = input.slice(start, cursorPos);
   if (token.length === 0) return null;
 

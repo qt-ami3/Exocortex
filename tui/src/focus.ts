@@ -22,7 +22,7 @@ import {
   scrollPageUp, scrollPageDown,
   scrollToTop, scrollToBottom,
 } from "./chat";
-import { handleSidebarKey, handleSidebarAction, moveSelection, syncSelectedIndex } from "./sidebar";
+import { handleSidebarKey, handleSidebarAction, moveSelection, syncSelectedIndex, type SidebarKeyResult } from "./sidebar";
 import { processKey, copyToClipboard, pasteFromClipboard, type VimContext } from "./vim";
 import { clampNormal } from "./vim/buffer";
 import { pushUndo, markInsertEntry, commitInsertSession, undo as undoFn, redo as redoFn } from "./undo";
@@ -357,65 +357,47 @@ function handleVimAction(action: string, state: RenderState): KeyResult {
     case "nav_down":
       return handleContextNavigation("down", state);
     case "nav_select":
-      if (state.panelFocus === "sidebar") {
-        const result = handleSidebarAction("nav_select", state.sidebar);
-        if (result.type === "select") {
-          return { type: "load_conversation", convId: result.convId };
-        }
-      }
-      return { type: "handled" };
     case "delete":
-      if (state.panelFocus === "sidebar") {
-        const result = handleSidebarAction("delete", state.sidebar);
-        if (result.type === "delete_conversation") {
-          return { type: "delete_conversation", convId: result.convId };
-        }
-      }
-      return { type: "handled" };
     case "undo_delete":
-      if (state.panelFocus === "sidebar") {
-        return { type: "undo_delete" };
-      }
-      return { type: "handled" };
     case "mark":
-      if (state.panelFocus === "sidebar") {
-        const result = handleSidebarAction("mark", state.sidebar);
-        if (result.type === "mark_conversation") {
-          return { type: "mark_conversation", convId: result.convId, marked: result.marked };
-        }
-      }
-      return { type: "handled" };
     case "pin":
-      if (state.panelFocus === "sidebar") {
-        const result = handleSidebarAction("pin", state.sidebar);
-        if (result.type === "pin_conversation") {
-          return { type: "pin_conversation", convId: result.convId, pinned: result.pinned };
-        }
-      }
-      return { type: "handled" };
     case "move_up":
     case "move_down":
-      if (state.panelFocus === "sidebar") {
-        const result = handleSidebarAction(action, state.sidebar);
-        if (result.type === "move_conversation") {
-          return { type: "move_conversation", convId: result.convId, direction: result.direction };
-        }
-      }
-      return { type: "handled" };
     case "clone":
-      if (state.panelFocus === "sidebar") {
-        const result = handleSidebarAction("clone", state.sidebar);
-        if (result.type === "clone_conversation") {
-          return { type: "clone_conversation", convId: result.convId };
-        }
-      }
-      return { type: "handled" };
+      return trySidebarAction(action, state);
     case "scroll_top":
     case "scroll_bottom":
       handleScrollAction(action as Action, state);
       return { type: "handled" };
     default:
       return { type: "handled" };
+  }
+}
+
+// ── Sidebar result mapping ────────────────────────────────────────
+
+/**
+ * Dispatch an action to the sidebar if focused, mapping the result
+ * to a KeyResult. Returns "handled" if sidebar isn't focused.
+ */
+function trySidebarAction(action: string, state: RenderState): KeyResult {
+  if (state.panelFocus !== "sidebar") return { type: "handled" };
+  return mapSidebarResult(handleSidebarAction(action, state.sidebar));
+}
+
+/** Map a SidebarKeyResult to a KeyResult. */
+function mapSidebarResult(result: SidebarKeyResult): KeyResult {
+  switch (result.type) {
+    case "select":
+      return { type: "load_conversation", convId: result.convId };
+    case "handled":
+    case "unhandled":
+      return { type: "handled" };
+    default:
+      // Remaining variants (delete_conversation, undo_delete, mark_conversation,
+      // pin_conversation, move_conversation, clone_conversation) are directly
+      // valid KeyResult types — forward as-is.
+      return result;
   }
 }
 
@@ -508,28 +490,13 @@ function getVimContext(state: RenderState): VimContext {
 function handleSidebarFocused(key: KeyEvent, state: RenderState): KeyResult {
   const result = handleSidebarKey(key, state.sidebar);
 
-  switch (result.type) {
-    case "handled":
-      return { type: "handled" };
-    case "select":
-      return { type: "load_conversation", convId: result.convId };
-    case "delete_conversation":
-      return { type: "delete_conversation", convId: result.convId };
-    case "undo_delete":
-      return { type: "undo_delete" };
-    case "mark_conversation":
-      return { type: "mark_conversation", convId: result.convId, marked: result.marked };
-    case "pin_conversation":
-      return { type: "pin_conversation", convId: result.convId, pinned: result.pinned };
-    case "move_conversation":
-      return { type: "move_conversation", convId: result.convId, direction: result.direction };
-    case "clone_conversation":
-      return { type: "clone_conversation", convId: result.convId };
-    case "unhandled":
-      // focus_prompt comes back as unhandled from sidebar (i/a)
-      state.panelFocus = "chat";
-      return { type: "handled" };
+  if (result.type === "unhandled") {
+    // focus_prompt comes back as unhandled from sidebar (i/a)
+    state.panelFocus = "chat";
+    return { type: "handled" };
   }
+
+  return mapSidebarResult(result);
 }
 
 // ── Chat panel (non-vim path) ──────────────────────────────────────

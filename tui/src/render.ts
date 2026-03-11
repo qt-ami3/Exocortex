@@ -17,7 +17,7 @@ import { show_cursor, hide_cursor, cursor_block, cursor_underline, cursor_bar, a
 import { theme } from "./theme";
 import { clampCursor, stripAnsi, contentBounds, logicalLineRange } from "./historycursor";
 import { renderLineWithCursor, renderLineWithSelection } from "./cursorrender";
-import { highlightPromptInput } from "./promptHighlight";
+import { highlightPromptInput } from "./prompthighlight";
 import { formatSize, imageLabel } from "./clipboard";
 
 import type { QueuePromptState, EditMessageState } from "./state";
