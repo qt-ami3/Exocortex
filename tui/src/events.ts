@@ -365,6 +365,34 @@ export function handleEvent(
       break;
     }
 
+    case "history_updated": {
+      if (event.convId !== state.convId) break;
+      // Context tool modified historical messages — replace committed messages
+      // but preserve pendingAI (the active streaming response).
+      state.messages = [];
+      state.contextTokens = event.contextTokens;
+      for (const entry of event.entries) {
+        switch (entry.type) {
+          case "user":
+            state.messages.push({ role: "user", text: entry.text, images: entry.images, metadata: null });
+            break;
+          case "ai":
+            state.messages.push({
+              role: "assistant",
+              blocks: entry.blocks,
+              metadata: entry.metadata ?? { startedAt: 0, endedAt: 0, model: state.model, tokens: 0 },
+            });
+            break;
+          case "system": {
+            const color = entry.color === "error" ? theme.error : entry.color === "warning" ? theme.warning : theme.muted;
+            state.messages.push({ role: "system", text: entry.text, color, metadata: null });
+            break;
+          }
+        }
+      }
+      break;
+    }
+
     case "ack":
     case "pong":
       break;

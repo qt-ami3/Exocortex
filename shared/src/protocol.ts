@@ -355,6 +355,15 @@ export interface ToolsAvailableEvent {
   tools: ToolDisplayInfo[];
 }
 
+export interface HistoryUpdatedEvent {
+  type: "history_updated";
+  convId: string;
+  /** The full message history after modification (same format as conversation_loaded). */
+  entries: DisplayEntry[];
+  /** Updated input token count. */
+  contextTokens: number | null;
+}
+
 export interface ErrorEvent {
   type: "error";
   reqId?: string;
@@ -389,4 +398,5 @@ export type Event =
   | StreamRetryEvent
   | SystemMessageEvent
   | ToolsAvailableEvent
+  | HistoryUpdatedEvent
   | ErrorEvent;

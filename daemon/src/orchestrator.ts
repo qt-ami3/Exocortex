@@ -241,6 +241,16 @@ export async function orchestrateSendMessage(
       // Persist immediately
       convStore.markDirty(convId);
       convStore.flush(convId);
+      // Notify TUI subscribers — replace historical messages without touching pendingAI
+      const displayData = convStore.getDisplayData(convId);
+      if (displayData) {
+        server.sendToSubscribers(convId, {
+          type: "history_updated",
+          convId,
+          entries: displayData.entries,
+          contextTokens: displayData.contextTokens,
+        });
+      }
       return rebuilt;
     },
   };
