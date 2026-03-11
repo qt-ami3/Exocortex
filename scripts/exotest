@@ -53,11 +53,9 @@ echo ""
 
 # ── Dependencies ────────────────────────────────────────────────────
 
-if [[ ! -d "$WORKTREE_DIR/node_modules" ]]; then
-  echo "  Installing dependencies..."
-  (cd "$WORKTREE_DIR" && bun install)
-  echo ""
-fi
+# Always run bun install — it's idempotent and fast (~200ms) when
+# everything is resolved, and catches stale/partial node_modules.
+(cd "$WORKTREE_DIR" && bun install --silent)
 
 # ── Daemon ──────────────────────────────────────────────────────────
 
