@@ -106,7 +106,7 @@ const commands: SlashCommand[] = [
   },
   {
     name: "/rename",
-    description: "Rename the current conversation (auto-generates if no title given)",
+    description: "Rename the current conversation",
     handler: (text, state) => {
       if (!state.convId) {
         state.messages.push({ role: "system", text: "No active conversation to rename.", metadata: null });
