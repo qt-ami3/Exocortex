@@ -263,7 +263,9 @@ export function createHandler(server: DaemonServer) {
 
       case "llm_complete": {
         const model = cmd.model ?? "haiku";
-        const maxTokens = cmd.maxTokens ?? 256;
+        // Default must exceed the thinking budget (10000) for non-adaptive
+        // models, otherwise all tokens go to thinking and text is empty.
+        const maxTokens = cmd.maxTokens ?? 16000;
         log("info", `handler: llm_complete (model=${model}, maxTokens=${maxTokens}, input=${cmd.userText.length} chars)`);
 
         // Fire-and-forget — ack immediately, send result when ready

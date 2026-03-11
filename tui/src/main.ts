@@ -121,7 +121,10 @@ function handleSubmit(): void {
             scheduleRender();
           },
           "haiku",
-          64,
+          // Must exceed the thinking budget (10000) configured in api.ts for
+          // non-adaptive models — otherwise all tokens go to thinking and the
+          // text response is empty.
+          10200,
         );
       }
       scheduleRender();

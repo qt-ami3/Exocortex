@@ -148,7 +148,7 @@ export interface LlmCompleteCommand {
   userText: string;
   /** Model to use. Defaults to "haiku". */
   model?: ModelId;
-  /** Max output tokens. Defaults to 256. */
+  /** Max output tokens. Defaults to 16000 (must exceed thinking budget for non-adaptive models). */
   maxTokens?: number;
 }
 
