@@ -15,6 +15,9 @@ import { glob } from "./glob";
 import { grep } from "./grep";
 import { edit } from "./edit";
 import { browse } from "./browse";
+import { context, executeContext, type ContextToolEnv } from "./context";
+
+export type { ContextToolEnv };
 
 // ── Registry ───────────────────────────────────────────────────────
 
@@ -26,6 +29,7 @@ const TOOLS: Tool[] = [
   grep,
   edit,
   browse,
+  context,
 ];
 
 const toolMap = new Map<string, Tool>(TOOLS.map(t => [t.name, t]));
@@ -89,8 +93,33 @@ function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
 
 // ── Build executor (injected into the agent loop) ──────────────────
 
-export function buildExecutor(): (calls: ApiToolCall[], signal?: AbortSignal) => Promise<ToolExecResult[]> {
+export function buildExecutor(
+  contextEnv?: ContextToolEnv,
+): (calls: ApiToolCall[], signal?: AbortSignal) => Promise<ToolExecResult[]> {
   return (calls, signal?) => Promise.all(calls.map(async (call): Promise<ToolExecResult> => {
+    // Context tool — needs conversation access, bypass normal execute()
+    if (call.name === "context" && contextEnv) {
+      const startTime = Date.now();
+      try {
+        const result = await raceAbort(
+          executeContext(call.input, contextEnv, signal),
+          signal,
+        );
+        return {
+          toolCallId: call.id,
+          toolName: call.name,
+          output: result.output,
+          isError: result.isError,
+        };
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          return { toolCallId: call.id, toolName: call.name, output: `User interrupted after ${elapsed}s of execution.`, isError: false };
+        }
+        return { toolCallId: call.id, toolName: call.name, output: `Tool error: ${err instanceof Error ? err.message : String(err)}`, isError: true };
+      }
+    }
+
     const tool = toolMap.get(call.name);
     let result: ToolResult;
     if (!tool) {

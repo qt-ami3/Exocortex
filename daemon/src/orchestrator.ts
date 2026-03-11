@@ -11,7 +11,7 @@ import { log } from "./log";
 import { loadAuth } from "./store";
 import { runAgentLoop, type AgentCallbacks, type AgentState } from "./agent";
 import { buildSystemPrompt } from "./system";
-import { getToolDefs, buildExecutor, summarizeTool } from "./tools/registry";
+import { getToolDefs, buildExecutor, summarizeTool, type ContextToolEnv } from "./tools/registry";
 import * as convStore from "./conversations";
 import type { DaemonServer, ConnectedClient } from "./server";
 import type { StoredMessage, ApiContentBlock } from "./messages";
@@ -92,6 +92,26 @@ export async function orchestrateSendMessage(
       role: m.role as "user" | "assistant",
       content: m.content,
     }));
+
+  // ── Context tool support ──────────────────────────────────────────
+  // Track whether context was modified this round so the agent loop
+  // can rebuild its local message array from the mutated conv.messages.
+  let contextModifiedThisRound = false;
+
+  // The current user message is the last entry in conv.messages.
+  // All messages from the current agent loop (newMessages) aren't in
+  // conv.messages yet. So protectedTailCount = 1 (just the user msg).
+  const protectedTailCount = 1;
+
+  const contextEnv: ContextToolEnv = {
+    conv,
+    onContextModified: () => { contextModifiedThisRound = true; },
+    summarizer: (name, input) => {
+      const s = summarizeTool(name, input);
+      return s.detail || s.label;
+    },
+    protectedTailCount,
+  };
 
   // Agent state for abort recovery — the agent populates completedMessages
   // after each full round. partialContent tracks the in-flight round only
@@ -210,6 +230,19 @@ export async function orchestrateSendMessage(
       }
       return apiMsgs;
     },
+    rebuildMessages(): import("./messages").ApiMessage[] | null {
+      if (!contextModifiedThisRound) return null;
+      contextModifiedThisRound = false;
+      log("info", `orchestrator: context modified, rebuilding message array`);
+      // Rebuild from conv.messages (now trimmed) — the source of truth for historical state
+      const rebuilt = conv.messages
+        .filter(m => m.role !== "system")
+        .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+      // Persist immediately
+      convStore.markDirty(convId);
+      convStore.flush(convId);
+      return rebuilt;
+    },
   };
 
   try {
@@ -217,7 +250,7 @@ export async function orchestrateSendMessage(
       system: buildSystemPrompt(),
       signal: ac.signal,
       tools: getToolDefs(),
-      executor: buildExecutor(),
+      executor: buildExecutor(contextEnv),
       summarizer: (name, input) => {
         const s = summarizeTool(name, input);
         return s.detail || s.label;

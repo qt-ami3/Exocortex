@@ -45,6 +45,13 @@ export interface AgentCallbacks {
    * into the conversation before the next API call.
    */
   drainNextTurnMessages?(): ApiMessage[];
+  /**
+   * Called after tool execution. If the context tool modified the conversation,
+   * returns a rebuilt base message array (historical messages, trimmed).
+   * The agent loop replaces its local messages with: rebuilt + newMessages.
+   * Returns null if no rebuild is needed.
+   */
+  rebuildMessages?(): ApiMessage[] | null;
 }
 
 // ── Tool execution ──────────────────────────────────────────────────
@@ -257,6 +264,15 @@ export async function runAgentLoop(
     const toolResultMsg: ApiMessage = { role: "user", content: toolResultContent };
     messages.push(toolResultMsg);
     newMessages.push(toolResultMsg);
+
+    // ── Context tool rebuild ─────────────────────────────────────
+    const rebuilt = callbacks.rebuildMessages?.();
+    if (rebuilt) {
+      // rebuilt = historical messages (trimmed). Append current loop's new messages.
+      messages.length = 0;
+      messages.push(...rebuilt, ...newMessages);
+      log("info", `agent: context rebuilt, messages=${messages.length} (${rebuilt.length} historical + ${newMessages.length} new)`);
+    }
 
     // Update recovery state — this round is fully complete
     if (state) {
