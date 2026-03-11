@@ -82,6 +82,13 @@ function fmt(n: number): string {
   return n.toLocaleString("en-US");
 }
 
+/** Sanitize a string for single-line table display: collapse whitespace, truncate. */
+function oneLine(s: string, maxLen = 60): string {
+  const clean = s.replace(/\s+/g, " ").trim();
+  if (clean.length <= maxLen) return clean;
+  return clean.slice(0, maxLen) + "…";
+}
+
 /** Classify a non-system turn as "user", "assistant", or "tool_result". */
 function turnType(msg: StoredMessage): "user" | "assistant" | "tool_result" {
   if (msg.role === "assistant") return "assistant";
@@ -300,7 +307,7 @@ function actionList(env: ContextToolEnv): ToolResult {
         } else if (b.type === "text") {
           if (b.text.length > 0) hasText = true;
         } else if (b.type === "tool_use") {
-          toolNames.push(`${b.name}(${summarizer(b.name, b.input)})`);
+          toolNames.push(`${b.name}(${oneLine(summarizer(b.name, b.input))})`);
         }
       }
 
@@ -325,7 +332,7 @@ function actionList(env: ContextToolEnv): ToolResult {
       for (const b of msg.content as ApiContentBlock[]) {
         if (b.type === "tool_result") {
           const tu = toolUseMap.get(b.tool_use_id);
-          const name = tu ? summarizer(tu.name, tu.input) : "?";
+          const name = tu ? oneLine(summarizer(tu.name, tu.input)) : "?";
           const ch = typeof b.content === "string" ? b.content.length : JSON.stringify(b.content).length;
           labels.push(`${name}→${fmt(ch)}ch`);
         }
