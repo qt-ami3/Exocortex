@@ -28,11 +28,17 @@ export type CommandHandler = (client: ConnectedClient, command: Command) => void
 export class DaemonServer {
   private server: Server | null = null;
   private clients = new Map<string, ConnectedClient>();
-  private handler: CommandHandler;
+  private handler: CommandHandler | null = null;
   private socketPath: string;
 
-  constructor(socketPath: string, handler: CommandHandler) {
+  constructor(socketPath: string, handler?: CommandHandler) {
     this.socketPath = socketPath;
+    this.handler = handler ?? null;
+  }
+
+  /** Set or replace the command handler. Allows constructing the server
+   *  before the handler is ready (avoids circular init). */
+  setHandler(handler: CommandHandler): void {
     this.handler = handler;
   }
 
@@ -100,6 +106,10 @@ export class DaemonServer {
 
       try {
         const cmd: Command = JSON.parse(line);
+        if (!this.handler) {
+          this.sendTo(client, { type: "error", message: "Server not ready" });
+          continue;
+        }
         const result = this.handler(client, cmd);
         if (result instanceof Promise) {
           result.catch((err: Error) => {

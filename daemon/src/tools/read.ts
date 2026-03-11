@@ -7,7 +7,7 @@
  */
 
 import type { Tool, ToolResult, ToolSummary } from "./types";
-import { cap } from "./util";
+import { cap, getString, getNumber } from "./util";
 import { log } from "../log";
 
 // ── Constants ──────────────────────────────────────────────────────
@@ -179,22 +179,22 @@ async function readTextFile(
 // ── Execution entry point ──────────────────────────────────────────
 
 async function executeRead(input: Record<string, unknown>): Promise<ToolResult> {
-  const filePath = input.file_path as string;
+  const filePath = getString(input, "file_path");
   if (!filePath) return { output: "Error: missing 'file_path' parameter", isError: true };
 
   if (isImageFile(filePath)) {
     return readImageFile(filePath);
   }
 
-  const offset = (input.offset as number) ?? 1;
-  const limit = (input.limit as number) ?? DEFAULT_LINE_LIMIT;
+  const offset = getNumber(input, "offset") ?? 1;
+  const limit = getNumber(input, "limit") ?? DEFAULT_LINE_LIMIT;
   return readTextFile(filePath, offset, limit);
 }
 
 // ── Summary ────────────────────────────────────────────────────────
 
 function summarize(input: Record<string, unknown>): ToolSummary {
-  const filePath = (input.file_path as string) ?? "";
+  const filePath = getString(input, "file_path") ?? "";
   return { label: "Read", detail: filePath };
 }
 

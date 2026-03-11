@@ -6,7 +6,7 @@
  */
 
 import type { Tool, ToolResult, ToolSummary } from "./types";
-import { cap } from "./util";
+import { cap, getString, getNumber, getBoolean } from "./util";
 import { log } from "../log";
 
 // ── Constants ──────────────────────────────────────────────────────
@@ -16,20 +16,20 @@ const EXCLUDED_DIRS = [".git", ".svn", ".hg", ".bzr"];
 // ── Execution ──────────────────────────────────────────────────────
 
 async function executeGrep(input: Record<string, unknown>, signal?: AbortSignal): Promise<ToolResult> {
-  const pattern = input.pattern as string;
+  const pattern = getString(input, "pattern");
   if (!pattern) return { output: "Error: missing 'pattern' parameter", isError: true };
 
-  const searchPath = (input.path as string) ?? process.cwd();
-  const globPattern = input.glob as string | undefined;
-  const fileType = input.type as string | undefined;
-  const mode = (input.output_mode as string) ?? "files_with_matches";
-  const beforeCtx = input["-B"] as number | undefined;
-  const afterCtx = input["-A"] as number | undefined;
-  const aroundCtx = input["-C"] as number | undefined;
-  const lineNumbers = (input["-n"] as boolean) ?? true;
-  const caseInsensitive = (input["-i"] as boolean) ?? false;
-  const multiline = (input.multiline as boolean) ?? false;
-  const headLimit = input.head_limit as number | undefined;
+  const searchPath = getString(input, "path") ?? process.cwd();
+  const globPattern = getString(input, "glob");
+  const fileType = getString(input, "type");
+  const mode = getString(input, "output_mode") ?? "files_with_matches";
+  const beforeCtx = getNumber(input, "-B");
+  const afterCtx = getNumber(input, "-A");
+  const aroundCtx = getNumber(input, "-C");
+  const lineNumbers = getBoolean(input, "-n") ?? true;
+  const caseInsensitive = getBoolean(input, "-i") ?? false;
+  const multiline = getBoolean(input, "multiline") ?? false;
+  const headLimit = getNumber(input, "head_limit");
 
   const args: string[] = ["--hidden"];
 
@@ -122,7 +122,7 @@ async function executeGrep(input: Record<string, unknown>, signal?: AbortSignal)
 // ── Summary ────────────────────────────────────────────────────────
 
 function summarize(input: Record<string, unknown>): ToolSummary {
-  const pattern = (input.pattern as string) ?? "";
+  const pattern = getString(input, "pattern") ?? "";
   return { label: "Grep", detail: `/${pattern}/` };
 }
 

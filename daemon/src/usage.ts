@@ -167,22 +167,25 @@ function parseHeaders(headers: Headers): UsageData | null {
 
 // ── Response parsing ────────────────────────────────────────────────
 
-function parseUsageResponse(data: any): UsageData {
+function parseUsageResponse(data: unknown): UsageData {
+  const obj = data as Record<string, unknown> | null | undefined;
   return {
-    fiveHour: parseWindow(data?.five_hour),
-    sevenDay: parseWindow(data?.seven_day),
+    fiveHour: parseWindow(obj?.five_hour),
+    sevenDay: parseWindow(obj?.seven_day),
   };
 }
 
-function parseWindow(w: any): UsageWindow | null {
-  if (!w || typeof w.utilization !== "number") return null;
+function parseWindow(w: unknown): UsageWindow | null {
+  if (!w || typeof w !== "object") return null;
+  const obj = w as Record<string, unknown>;
+  if (typeof obj.utilization !== "number") return null;
   return {
-    utilization: w.utilization,
-    resetsAt: parseResetValue(w.resets_at),
+    utilization: obj.utilization,
+    resetsAt: parseResetValue(obj.resets_at),
   };
 }
 
-function parseResetValue(val: any): number | null {
+function parseResetValue(val: unknown): number | null {
   if (val == null) return null;
   if (typeof val === "number") {
     // Unix timestamps in seconds (< 1e12) vs milliseconds (>= 1e12)

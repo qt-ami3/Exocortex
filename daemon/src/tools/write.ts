@@ -7,13 +7,14 @@
  */
 
 import type { Tool, ToolResult, ToolSummary } from "./types";
+import { getString } from "./util";
 import { log } from "../log";
 
 // ── Execution ──────────────────────────────────────────────────────
 
 async function executeWrite(input: Record<string, unknown>): Promise<ToolResult> {
-  const filePath = input.file_path as string;
-  const content = input.content as string;
+  const filePath = getString(input, "file_path");
+  const content = getString(input, "content");
 
   if (!filePath) return { output: "Error: missing 'file_path' parameter", isError: true };
   if (content == null) return { output: "Error: missing 'content' parameter", isError: true };
@@ -48,7 +49,7 @@ async function executeWrite(input: Record<string, unknown>): Promise<ToolResult>
 // ── Summary ────────────────────────────────────────────────────────
 
 function summarize(input: Record<string, unknown>): ToolSummary {
-  const filePath = (input.file_path as string) ?? "";
+  const filePath = getString(input, "file_path") ?? "";
   return { label: "Write", detail: filePath };
 }
 

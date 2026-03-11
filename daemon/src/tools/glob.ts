@@ -14,7 +14,7 @@
  */
 
 import type { Tool, ToolResult, ToolSummary } from "./types";
-import { cap } from "./util";
+import { cap, getString, getBoolean } from "./util";
 import { log } from "../log";
 
 // ── Constants ─────────────────────────────────────────────────────
@@ -53,11 +53,11 @@ async function getGitFiles(cwd: string, signal?: AbortSignal): Promise<string[] 
 // ── Execution ─────────────────────────────────────────────────────
 
 async function executeGlob(input: Record<string, unknown>, signal?: AbortSignal): Promise<ToolResult> {
-  const pattern = input.pattern as string;
+  const pattern = getString(input, "pattern");
   if (!pattern) return { output: "Error: missing 'pattern' parameter", isError: true };
 
-  const cwd = (input.path as string) ?? process.cwd();
-  const noIgnore = (input.no_ignore as boolean) ?? false;
+  const cwd = getString(input, "path") ?? process.cwd();
+  const noIgnore = getBoolean(input, "no_ignore") ?? false;
 
   try {
     const glob = new Bun.Glob(pattern);
@@ -118,7 +118,7 @@ async function executeGlob(input: Record<string, unknown>, signal?: AbortSignal)
 // ── Summary ───────────────────────────────────────────────────────
 
 function summarize(input: Record<string, unknown>): ToolSummary {
-  const pattern = (input.pattern as string) ?? "";
+  const pattern = getString(input, "pattern") ?? "";
   return { label: "Glob", detail: pattern };
 }
 

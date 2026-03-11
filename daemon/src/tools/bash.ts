@@ -9,7 +9,7 @@
 import { spawn } from "child_process";
 import { writeFileSync } from "fs";
 import type { Tool, ToolResult, ToolSummary } from "./types";
-import { MAX_OUTPUT_CHARS } from "./util";
+import { MAX_OUTPUT_CHARS, getString, getNumber } from "./util";
 
 // ── Constants ──────────────────────────────────────────────────────
 
@@ -90,10 +90,10 @@ function killProcessGroup(pid: number): void {
 // ── Execution ──────────────────────────────────────────────────────
 
 async function executeBash(input: Record<string, unknown>, signal?: AbortSignal): Promise<ToolResult> {
-  const command = input.command as string;
+  const command = getString(input, "command");
   if (!command) return { output: "Error: missing 'command' parameter", isError: true };
 
-  const timeout = (input.timeout as number) ?? DEFAULT_TIMEOUT_MS;
+  const timeout = getNumber(input, "timeout") ?? DEFAULT_TIMEOUT_MS;
 
   const startTime = Date.now();
 
@@ -179,7 +179,7 @@ async function executeBash(input: Record<string, unknown>, signal?: AbortSignal)
 // ── Summary ────────────────────────────────────────────────────────
 
 function summarize(input: Record<string, unknown>): ToolSummary {
-  const command = (input.command as string) ?? "";
+  const command = getString(input, "command") ?? "";
   return { label: "$", detail: command.slice(0, 200) };
 }
 

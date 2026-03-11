@@ -7,6 +7,7 @@
  */
 
 import type { Tool, ToolResult, ToolSummary } from "./types";
+import { getString, getBoolean } from "./util";
 import { log } from "../log";
 
 // ── Constants ──────────────────────────────────────────────────────
@@ -16,10 +17,10 @@ const CONTEXT_LINES = 4;
 // ── Execution ──────────────────────────────────────────────────────
 
 async function executeEdit(input: Record<string, unknown>): Promise<ToolResult> {
-  const filePath = input.file_path as string;
-  const oldString = input.old_string as string;
-  const newString = input.new_string as string;
-  const replaceAll = (input.replace_all as boolean) ?? false;
+  const filePath = getString(input, "file_path");
+  const oldString = getString(input, "old_string");
+  const newString = getString(input, "new_string");
+  const replaceAll = getBoolean(input, "replace_all") ?? false;
 
   if (!filePath) return { output: "Error: missing 'file_path' parameter", isError: true };
   if (oldString == null) return { output: "Error: missing 'old_string' parameter", isError: true };
@@ -112,7 +113,7 @@ async function executeEdit(input: Record<string, unknown>): Promise<ToolResult> 
 // ── Summary ────────────────────────────────────────────────────────
 
 function summarize(input: Record<string, unknown>): ToolSummary {
-  const filePath = (input.file_path as string) ?? "";
+  const filePath = getString(input, "file_path") ?? "";
   return { label: "Edit", detail: filePath };
 }
 

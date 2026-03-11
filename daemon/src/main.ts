@@ -71,11 +71,9 @@ async function startDaemon(): Promise<void> {
   // Write PID file
   writeFileSync(PID_PATH, String(process.pid));
 
-  // Create server — handler is set up with a forward reference
-  // since the handler needs the server instance for sending events.
-  let commandHandler: ((client: import("./server").ConnectedClient, cmd: import("./protocol").Command) => void | Promise<void>) | null = null;
-  const server = new DaemonServer(SOCKET_PATH, (client, cmd) => commandHandler?.(client, cmd));
-  commandHandler = createHandler(server);
+  // Create server, then wire the handler (which needs the server reference)
+  const server = new DaemonServer(SOCKET_PATH);
+  server.setHandler(createHandler(server));
 
   // Graceful shutdown
   const shutdown = async () => {

@@ -10,3 +10,23 @@ export function cap(text: string): string {
   return text.slice(0, MAX_OUTPUT_CHARS) +
     `\n... output truncated (showed ${MAX_OUTPUT_CHARS} of ${text.length} characters)`;
 }
+
+// ── Input validation helpers ──────────────────────────────────────
+
+/** Extract a string from tool input, returning undefined if missing or wrong type. */
+export function getString(input: Record<string, unknown>, key: string): string | undefined {
+  const v = input[key];
+  return typeof v === "string" ? v : undefined;
+}
+
+/** Extract a number from tool input, returning undefined if missing or wrong type. */
+export function getNumber(input: Record<string, unknown>, key: string): number | undefined {
+  const v = input[key];
+  return typeof v === "number" ? v : undefined;
+}
+
+/** Extract a boolean from tool input, returning undefined if missing or wrong type. */
+export function getBoolean(input: Record<string, unknown>, key: string): boolean | undefined {
+  const v = input[key];
+  return typeof v === "boolean" ? v : undefined;
+}

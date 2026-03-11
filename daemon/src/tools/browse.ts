@@ -8,7 +8,7 @@
  */
 
 import type { Tool, ToolResult, ToolSummary } from "./types";
-import { cap } from "./util";
+import { cap, getString } from "./util";
 import { htmlToMarkdown } from "./html";
 import { complete } from "../llm";
 import { log } from "../log";
@@ -69,8 +69,8 @@ async function summarizeContent(url: string, markdown: string, prompt?: string, 
 // ── Execution ──────────────────────────────────────────────────────
 
 async function executeBrowse(input: Record<string, unknown>, signal?: AbortSignal): Promise<ToolResult> {
-  const url = input.url as string;
-  const prompt = input.prompt as string;
+  const url = getString(input, "url");
+  const prompt = getString(input, "prompt");
 
   if (!url) return { output: "Error: missing 'url' parameter", isError: true };
 
@@ -169,7 +169,7 @@ async function executeBrowse(input: Record<string, unknown>, signal?: AbortSigna
 // ── Summary ────────────────────────────────────────────────────────
 
 function summarize(input: Record<string, unknown>): ToolSummary {
-  const url = (input.url as string) ?? "";
+  const url = getString(input, "url") ?? "";
   return { label: "Browse", detail: url };
 }
 
