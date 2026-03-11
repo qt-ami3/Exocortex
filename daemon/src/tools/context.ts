@@ -769,7 +769,7 @@ export const context: Tool = {
     },
     required: ["action"],
   },
-  systemHint: undefined,
+  systemHint: "When approaching the context limit, use the context tool to free space: strip_thinking first (cheap, high impact), then summarize or delete old turns.",
   display: {
     label: "Context",
     color: "#e2b35e",  // warm gold
