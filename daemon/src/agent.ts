@@ -11,8 +11,9 @@
 
 import { streamMessage, type ApiToolCall } from "./api";
 import { log } from "./log";
-import type { ModelId, Block, ToolCallBlock, ToolResultBlock, ApiMessage } from "./messages";
+import type { ModelId, Block, ToolCallBlock, ToolResultBlock, ApiMessage, ApiContentBlock } from "./messages";
 import { MAX_OUTPUT_CHARS, cap } from "./tools/util";
+import { CONTEXT_LIMIT } from "./constants";
 
 // ── Callbacks ───────────────────────────────────────────────────────
 
@@ -52,8 +53,6 @@ export interface AgentCallbacks {
    * Returns null if no rebuild is needed.
    */
   rebuildMessages?(): ApiMessage[] | null;
-  /** Context pressure hint — fired when input tokens cross a threshold. */
-  onContextHint?(text: string): void;
 }
 
 // ── Tool execution ──────────────────────────────────────────────────
@@ -135,7 +134,6 @@ export async function runAgentLoop(
   let lastInputTokens = 0;
 
   // Context pressure thresholds — injected as text blocks in tool result messages
-  const CONTEXT_LIMIT = 200_000;
   const THRESHOLDS = [
     { at: 128_000, level: "advisory" as const },
     { at: 164_000, level: "warning" as const },
@@ -234,7 +232,7 @@ export async function runAgentLoop(
     const execResults = await options.executor(result.toolCalls, options.signal);
 
     // ── Emit tool result blocks + build API tool_result message ───
-    const toolResultContent: ApiMessage["content"] = [];
+    const toolResultContent: ApiContentBlock[] = [];
     for (const r of execResults) {
       // Central safety net: cap tool output so no tool can brick the conversation,
       // even if the tool's own limiting logic has a bug.
@@ -276,37 +274,36 @@ export async function runAgentLoop(
 
     // ── Context pressure hints ────────────────────────────────────
     // Inject a text block into the tool result message when context
-    // usage crosses hardcoded thresholds. Advisory and warning fire
-    // once; critical fires every round until the AI frees space.
+    // usage crosses hardcoded thresholds. The AI sees this as a
+    // peer-level instruction alongside tool results; display.ts
+    // filters it out so it never renders in the TUI (the status bar
+    // shows context tokens in real time instead).
     if (lastInputTokens > 0) {
       const pct = ((lastInputTokens / CONTEXT_LIMIT) * 100).toFixed(0);
       const usage = `${Math.round(lastInputTokens / 1000)}k/${CONTEXT_LIMIT / 1000}k tokens (${pct}%)`;
       let hint: string | null = null;
 
+      // Find the highest threshold that applies (iterate high→low, process first match)
       for (let i = THRESHOLDS.length - 1; i >= 0; i--) {
         if (lastInputTokens < THRESHOLDS[i].at) continue;
         const { level } = THRESHOLDS[i];
 
         if (level === "critical") {
+          // Critical fires every round until the AI frees space
           hint = `[Context: ${usage} — critically low on context! Use the context tool immediately to free space.]`;
           highestFiredLevel = Math.max(highestFiredLevel, i);
-          break;
-        }
-        if (i > highestFiredLevel) {
-          if (level === "warning") {
-            hint = `[Context: ${usage} — context is getting full. Use the context tool now to free space before you run out.]`;
-          } else {
-            hint = `[Context: ${usage} — consider using the context tool to free space. Start with strip_thinking, then summarize or delete old turns.]`;
-          }
+        } else if (i > highestFiredLevel) {
+          // Advisory and warning fire once
+          hint = level === "warning"
+            ? `[Context: ${usage} — context is getting full. Use the context tool now to free space before you run out.]`
+            : `[Context: ${usage} — consider using the context tool to free space. Start with strip_thinking, then summarize or delete old turns.]`;
           highestFiredLevel = i;
-          break;
         }
-        break;
+        break; // Only process the highest matching threshold
       }
 
       if (hint) {
         (toolResultContent as unknown[]).push({ type: "text", text: hint });
-        callbacks.onContextHint?.(hint);
         log("info", `agent: injected context pressure hint (${THRESHOLDS[Math.max(0, highestFiredLevel)].level}, ${usage})`);
       }
     }

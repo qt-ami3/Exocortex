@@ -351,14 +351,9 @@ export function handleEvent(
       if (event.convId !== state.convId) break;
       const color = event.color === "error" ? theme.error
         : event.color === "warning" ? theme.warning
-        : event.color === "context" ? theme.warning
         : theme.muted;
       const sysMsg: SystemMessage = { role: "system", text: event.text, color, metadata: null };
-      if (event.color === "context") {
-        // Context pressure hints render immediately (not buffered) — same as stream_retry
-        state.messages.push(sysMsg);
-      } else if (isStreaming(state)) {
-        // Buffer during streaming so it appears after the AI message
+      if (isStreaming(state)) {
         state.systemMessageBuffer.push(sysMsg);
       } else {
         state.messages.push(sysMsg);
@@ -375,7 +370,9 @@ export function handleEvent(
       if (event.convId !== state.convId) break;
       // Context tool modified historical messages — replace committed messages
       // but preserve pendingAI (the active streaming response).
+      // Flush buffered system messages — they reference pre-modification state.
       state.messages = [];
+      state.systemMessageBuffer = [];
       state.contextTokens = event.contextTokens;
       for (const entry of event.entries) {
         switch (entry.type) {

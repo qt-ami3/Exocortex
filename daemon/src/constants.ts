@@ -6,3 +6,6 @@
  */
 
 export const ANTHROPIC_BASE_URL = "https://api.anthropic.com";
+
+/** Maximum context window size in tokens (model-dependent; using Claude's max). */
+export const CONTEXT_LIMIT = 200_000;
