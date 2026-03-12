@@ -7,7 +7,7 @@
 
 import type { RenderState } from "./state";
 import { isStreaming, clearPendingAI } from "./state";
-import { ensureCurrentBlock, createPendingAI, sortConversations } from "./messages";
+import { ensureCurrentBlock, createPendingAI } from "./messages";
 import type { AIMessage, SystemMessage, ImageAttachment } from "./messages";
 import { updateConversationList, updateConversation, syncSelectedIndex } from "./sidebar";
 import { theme } from "./theme";
@@ -234,16 +234,6 @@ export function handleEvent(
     case "conversation_marked": {
       const conv = state.sidebar.conversations.find(c => c.id === event.convId);
       if (conv) conv.marked = event.marked;
-      break;
-    }
-
-    case "conversation_pinned": {
-      const conv = state.sidebar.conversations.find(c => c.id === event.convId);
-      if (conv) {
-        conv.pinned = event.pinned;
-        sortConversations(state.sidebar.conversations);
-        syncSelectedIndex(state.sidebar);
-      }
       break;
     }
 
