@@ -7,7 +7,7 @@
  */
 
 import type { Conversation, ModelId, ConversationSummary, StoredMessage } from "./messages";
-import { createConversation, sortConversations, displayName, extractPreview, isToolResultMessage, topUnpinnedOrder, bottomPinnedOrder } from "./messages";
+import { createConversation, sortConversations, isToolResultMessage, topUnpinnedOrder, bottomPinnedOrder } from "./messages";
 import { buildDisplayData, type ConversationDisplayData } from "./display";
 import { summarizeTool } from "./tools/registry";
 import * as persistence from "./persistence";
@@ -37,8 +37,8 @@ export function generateId(): string {
 
 // ── Conversations ───────────────────────────────────────────────────
 
-export function create(id: string, model: ModelId): Conversation {
-  const conv = createConversation(id, model, topUnpinnedOrder(conversations.values()));
+export function create(id: string, model: ModelId, title?: string): Conversation {
+  const conv = createConversation(id, model, topUnpinnedOrder(conversations.values()), title);
   conversations.set(id, conv);
   markDirty(id);
   flush(id);
@@ -84,7 +84,7 @@ export function clone(id: string): Conversation | null {
     marked: src.marked,
     pinned: src.pinned,
     sortOrder: newOrder,
-    title: displayName(src) + " 📋",
+    title: (src.title || "clone") + " 📋",
   };
 
   conversations.set(newId, conv);
@@ -310,8 +310,7 @@ export function getSummary(id: string): ConversationSummary | null {
     createdAt: conv.createdAt,
     updatedAt: conv.updatedAt,
     messageCount: conv.messages.length,
-    preview: extractPreview(conv.messages),
-    title: conv.title ?? null,
+    title: conv.title,
     marked: conv.marked,
     pinned: conv.pinned,
     streaming: streaming.isStreaming(conv.id),

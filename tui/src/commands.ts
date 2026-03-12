@@ -14,6 +14,7 @@ import { clearPrompt } from "./promptline";
 import type { ModelId } from "./messages";
 import { convDisplayName } from "./messages";
 import { copyToClipboard } from "./vim/clipboard";
+import { PENDING_TITLE } from "./titlegen";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ const commands: SlashCommand[] = [
       if (!title) {
         // Auto-generate: set placeholder and request LLM-generated title
         const conv = state.sidebar.conversations.find(c => c.id === state.convId);
-        if (conv) conv.title = "(pending)";
+        if (conv) conv.title = PENDING_TITLE;
         clearPrompt(state);
         return { type: "generate_title" };
       }

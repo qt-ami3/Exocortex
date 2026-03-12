@@ -22,6 +22,8 @@ export interface NewConversationCommand {
   type: "new_conversation";
   reqId?: string;
   model?: ModelId;
+  /** Initial title. Clients that don't set this get an empty title. */
+  title?: string;
 }
 
 export interface SendMessageCommand {

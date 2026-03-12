@@ -23,6 +23,9 @@ const MAX_TOKENS = 10200;
 /** Max characters of user message context to send for title generation. */
 const MAX_CONTEXT_CHARS = 2000;
 
+/** Placeholder title shown while generation is in-flight. */
+export const PENDING_TITLE = "pending";
+
 // ── Helpers ────────────────────────────────────────────────────────
 
 /** Collect user messages into a single string, truncated to MAX_CONTEXT_CHARS. */
@@ -61,9 +64,7 @@ export function generateTitle(
       scheduleRender();
     },
     (error) => {
-      // Revert "(pending)" — clear the title so the sidebar falls back to preview
-      const conv = state.sidebar.conversations.find(c => c.id === convId);
-      if (conv) conv.title = null;
+      // Leave as "pending" — no preview fallback exists anymore.
       state.messages.push({ role: "system", text: `✗ Title generation failed: ${error}`, metadata: null });
       scheduleRender();
     },

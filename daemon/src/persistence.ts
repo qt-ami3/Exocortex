@@ -14,11 +14,11 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlink
 import { log } from "./log";
 import { conversationsDir, trashDir } from "@exocortex/shared/paths";
 import type { Conversation, StoredMessage, ApiMessage, ModelId, ConversationSummary } from "./messages";
-import { sortConversations, extractPreview } from "./messages";
+import { sortConversations } from "./messages";
 
 // ── Schema version ──────────────────────────────────────────────────
 
-const CURRENT_VERSION = 7;
+const CURRENT_VERSION = 8;
 
 interface ConversationFileV1 {
   version: 1;
@@ -98,7 +98,22 @@ interface ConversationFileV7 {
   title: string | null;
 }
 
-type ConversationFile = ConversationFileV7;
+interface ConversationFileV8 {
+  version: 8;
+  id: string;
+  model: ModelId;
+  messages: StoredMessage[];
+  createdAt: number;
+  updatedAt: number;
+  lastContextTokens: number | null;
+  marked: boolean;
+  pinned: boolean;
+  sortOrder: number;
+  /** Non-nullable title. Naming logic lives in the client. */
+  title: string;
+}
+
+type ConversationFile = ConversationFileV8;
 
 // ── Migrations ──────────────────────────────────────────────────────
 
@@ -160,6 +175,29 @@ function migrateV6toV7(data: ConversationFileV6): ConversationFileV7 {
   };
 }
 
+/** Extract a short preview from the first user message (used only for one-time v7→v8 migration). */
+function legacyPreview(messages: StoredMessage[]): string {
+  for (const msg of messages) {
+    if (msg.role !== "user") continue;
+    if (typeof msg.content === "string") return msg.content.slice(0, 80);
+    if (Array.isArray(msg.content)) {
+      const tb = msg.content.find((b) => b.type === "text") as { type: "text"; text: string } | undefined;
+      if (tb) return tb.text.slice(0, 80);
+      return "📎 Image";
+    }
+  }
+  return "";
+}
+
+/** v7 → v8: Make title non-nullable. Existing null titles get a one-time preview from messages. */
+function migrateV7toV8(data: ConversationFileV7): ConversationFileV8 {
+  return {
+    ...data,
+    version: 8,
+    title: data.title ?? legacyPreview(data.messages),
+  };
+}
+
 function migrate(raw: Record<string, unknown>): ConversationFile {
   // Progressive migration — each function validates and upgrades one version.
   // `any` is intentional at this deserialization boundary: the data is parsed
@@ -172,6 +210,7 @@ function migrate(raw: Record<string, unknown>): ConversationFile {
   if (data.version < 5) data = migrateV4toV5(data);
   if (data.version < 6) data = migrateV5toV6(data);
   if (data.version < 7) data = migrateV6toV7(data);
+  if (data.version < 8) data = migrateV7toV8(data);
 
   if (data.version !== CURRENT_VERSION) {
     log("warn", `persistence: unknown schema version ${data.version}, attempting to load as v${CURRENT_VERSION}`);
@@ -339,14 +378,12 @@ export function loadAll(): ConversationSummary[] {
     try {
       const raw = JSON.parse(readFileSync(path, "utf-8"));
       const file = migrate(raw);
-      const preview = extractPreview(file.messages);
       summaries.push({
         id: file.id,
         model: file.model,
         createdAt: file.createdAt,
         updatedAt: file.updatedAt,
         messageCount: file.messages.length,
-        preview,
         title: file.title,
         marked: file.marked,
         pinned: file.pinned,

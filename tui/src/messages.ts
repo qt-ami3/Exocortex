@@ -13,12 +13,12 @@ export * from "@exocortex/shared/messages";
 
 import type { AIMessage, Block, ModelId, ConversationSummary } from "@exocortex/shared/messages";
 
-/** Resolve the display name for a conversation: title > preview > fallback. */
+/** Resolve the display name for a conversation: title or fallback. */
 export function convDisplayName(
-  conv: Pick<ConversationSummary, "title" | "preview">,
+  conv: Pick<ConversationSummary, "title">,
   fallback = "",
 ): string {
-  let name = conv.title || conv.preview || fallback;
+  let name = conv.title || fallback;
   const nl = name.indexOf("\n");
   if (nl !== -1) name = name.slice(0, nl);
   return name;

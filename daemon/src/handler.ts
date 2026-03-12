@@ -41,8 +41,8 @@ export function createHandler(server: DaemonServer) {
       case "new_conversation": {
         const id = convStore.generateId();
         const model = cmd.model ?? "opus";
-        convStore.create(id, model);
-        log("info", `handler: created conversation ${id} (model=${model})`);
+        convStore.create(id, model, cmd.title);
+        log("info", `handler: created conversation ${id} (model=${model}, title="${cmd.title ?? ""}")`);
 
         server.sendTo(client, {
           type: "conversation_created",

@@ -80,8 +80,8 @@ export class DaemonClient {
 
   // ── Convenience methods ─────────────────────────────────────────
 
-  createConversation(model?: import("./protocol").ModelId): void {
-    this.send({ type: "new_conversation", model });
+  createConversation(model?: import("./protocol").ModelId, title?: string): void {
+    this.send({ type: "new_conversation", model, title });
   }
 
   subscribe(convId: string): void {

@@ -81,7 +81,7 @@ export async function orchestrateSendMessage(
   convStore.setActiveJob(convId, ac, startedAt);
   convStore.initStreamingBlocks(convId);
 
-  // Broadcast sidebar update (user message preview + streaming indicator)
+  // Broadcast sidebar update (streaming indicator)
   server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(convId)! });
   server.sendToSubscribers(convId, { type: "streaming_started", convId, model: conv.model, startedAt });
 

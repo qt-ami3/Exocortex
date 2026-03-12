@@ -106,9 +106,8 @@ export interface ConversationSummary {
   createdAt: number;
   updatedAt: number;
   messageCount: number;
-  preview: string;
-  /** Explicit user-set title. Takes priority over auto-generated preview. */
-  title: string | null;
+  /** Client-set title. The daemon stores it as-is — naming logic lives in the client. */
+  title: string;
   marked: boolean;
   pinned: boolean;
   streaming: boolean;

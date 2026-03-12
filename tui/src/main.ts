@@ -21,7 +21,7 @@ import { createPendingAI, type ImageAttachment } from "./messages";
 import { handleEvent } from "./events";
 import { confirmQueueMessage, cancelQueuePrompt, clearLocalQueue, removeLocalQueueEntry } from "./queue";
 import { confirmEditMessage, cancelEditMessage } from "./editmessage";
-import { generateTitle } from "./titlegen";
+import { generateTitle, PENDING_TITLE } from "./titlegen";
 import { theme } from "./theme";
 import type { Event } from "./protocol";
 
@@ -141,7 +141,7 @@ function sendDirectly(messageText: string, images?: ImageAttachment[]): void {
     state.pendingSend.active = true;
     state.pendingSend.text = messageText;
     state.pendingSend.images = images;
-    daemon.createConversation(state.model);
+    daemon.createConversation(state.model, PENDING_TITLE);
   } else {
     daemon.sendMessage(state.convId, messageText, startedAt, images);
   }

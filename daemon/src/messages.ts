@@ -45,30 +45,8 @@ export interface Conversation {
   marked: boolean;
   pinned: boolean;
   sortOrder: number;
-  /** Explicit user-set title. Null means use auto-generated preview. */
-  title: string | null;
-}
-
-/** Extract a short preview from the first user message in a message list. */
-export function extractPreview(messages: StoredMessage[]): string {
-  for (const msg of messages) {
-    if (msg.role !== "user") continue;
-    if (typeof msg.content === "string") {
-      return msg.content.slice(0, 80);
-    }
-    // User message with image blocks — find the text block
-    if (Array.isArray(msg.content)) {
-      const textBlock = msg.content.find((b) => b.type === "text") as { type: "text"; text: string } | undefined;
-      if (textBlock) return textBlock.text.slice(0, 80);
-      return "📎 Image";
-    }
-  }
-  return "";
-}
-
-/** Resolve the display name: explicit title, first-message preview, or "(empty)". */
-export function displayName(conv: Conversation): string {
-  return conv.title || extractPreview(conv.messages) || "(empty)";
+  /** Client-set title. The daemon stores it as-is — naming logic lives in the client. */
+  title: string;
 }
 
 /**
@@ -92,7 +70,7 @@ export function isToolResultMessage(msg: StoredMessage): boolean {
   return msg.content.length > 0 && msg.content.some(b => b.type === "tool_result");
 }
 
-export function createConversation(id: string, model: ModelId, sortOrder?: number): Conversation {
+export function createConversation(id: string, model: ModelId, sortOrder?: number, title?: string): Conversation {
   const now = Date.now();
   return {
     id,
@@ -104,6 +82,6 @@ export function createConversation(id: string, model: ModelId, sortOrder?: numbe
     marked: false,
     pinned: false,
     sortOrder: sortOrder ?? -now,
-    title: null,
+    title: title ?? "",
   };
 }
