@@ -9,3 +9,10 @@ export const ANTHROPIC_BASE_URL = "https://api.anthropic.com";
 
 /** Maximum context window size in tokens (model-dependent; using Claude's max). */
 export const CONTEXT_LIMIT = 200_000;
+
+/**
+ * After this many seconds a bash tool call is "backgrounded": the process
+ * keeps running but the tool result is returned immediately with the PID
+ * and a temp file path so the AI can check on it later.
+ */
+export const TOOL_BACKGROUND_SECONDS = Number(process.env.TOOL_BACKGROUND_SECONDS) || 60;

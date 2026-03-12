@@ -4,12 +4,18 @@
  * Output protection: when stdout+stderr exceeds ~30K characters, the full
  * output is saved to a temp file and a head+tail preview is returned.
  * The agent can use the read tool to paginate through the full output.
+ *
+ * Backgrounding: when a command runs longer than TOOL_BACKGROUND_SECONDS,
+ * the promise resolves with partial output + PID + temp file path.
+ * The process keeps running and its output continues being written to the
+ * temp file. The AI can check on it, read its output, or kill it.
  */
 
 import { spawn } from "child_process";
-import { writeFileSync } from "fs";
+import { writeFileSync, createWriteStream, type WriteStream } from "fs";
 import type { Tool, ToolResult, ToolSummary } from "./types";
 import { MAX_OUTPUT_CHARS, getString, getNumber } from "./util";
+import { TOOL_BACKGROUND_SECONDS } from "../constants";
 
 // ── Constants ──────────────────────────────────────────────────────
 
@@ -89,7 +95,39 @@ function killProcessGroup(pid: number): void {
 
 // ── Execution ──────────────────────────────────────────────────────
 
+/** Conforms to Tool.execute — no backgrounding (used if called via the generic path). */
 async function executeBash(input: Record<string, unknown>, signal?: AbortSignal): Promise<ToolResult> {
+  return executeBashImpl(input, signal);
+}
+
+/**
+ * Execute a bash command with backgrounding support.
+ *
+ * When the command doesn't finish in time, the promise resolves with
+ * partial output + PID + temp file path. The process keeps running —
+ * its output is written to the temp file.
+ *
+ * When the AI passes `await` (seconds), it fully overrides the default
+ * background threshold — even if shorter.
+ *
+ * Called directly by the registry (bypassing Tool.execute) so it can
+ * inject the default background timeout from TOOL_BACKGROUND_SECONDS.
+ */
+export async function executeBashBackgroundable(
+  input: Record<string, unknown>,
+  signal?: AbortSignal,
+  defaultBgMs?: number,
+): Promise<ToolResult> {
+  const awaitSeconds = getNumber(input, "await");
+  const bgMs = awaitSeconds ? awaitSeconds * 1000 : defaultBgMs;
+  return executeBashImpl(input, signal, bgMs);
+}
+
+async function executeBashImpl(
+  input: Record<string, unknown>,
+  signal?: AbortSignal,
+  backgroundAfterMs?: number,
+): Promise<ToolResult> {
   const command = getString(input, "command");
   if (!command) return { output: "Error: missing 'command' parameter", isError: true };
 
@@ -110,8 +148,17 @@ async function executeBash(input: Record<string, unknown>, signal?: AbortSignal)
     let totalBytes = 0;
     let byteTruncated = false;
     let settled = false;
+    let bgTimer: ReturnType<typeof setTimeout> | undefined;
+
+    // When backgrounded, output is redirected to this write stream.
+    let bgStream: WriteStream | undefined;
 
     function collect(data: Buffer): void {
+      // After backgrounding, write to temp file instead of in-memory buffer
+      if (bgStream) {
+        bgStream.write(data);
+        return;
+      }
       if (byteTruncated) return;
       totalBytes += data.length;
       if (totalBytes > MAX_OUTPUT_BYTES) {
@@ -131,7 +178,9 @@ async function executeBash(input: Record<string, unknown>, signal?: AbortSignal)
     // background via killProcessGroup.
     if (signal) {
       const onAbort = () => {
+        if (bgTimer) clearTimeout(bgTimer);
         if (proc.pid) killProcessGroup(proc.pid);
+        if (bgStream) { bgStream.end(); bgStream = undefined; }
         if (settled) return;
         settled = true;
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -148,13 +197,60 @@ async function executeBash(input: Record<string, unknown>, signal?: AbortSignal)
       }
     }
 
+    // ── Background handling: detach after timeout ─────────────
+    // The process keeps running. Output is redirected to a temp file.
+    // The promise resolves with partial output + instructions for the AI.
+    if (backgroundAfterMs && backgroundAfterMs > 0) {
+      bgTimer = setTimeout(() => {
+        if (settled || !proc.pid) return;
+        settled = true;
+
+        const spillPath = `/tmp/exocortex-bash-${proc.pid}-${Date.now()}.tmp`;
+        const partial = Buffer.concat(chunks).toString("utf8");
+
+        // Open write stream and flush accumulated output to it
+        bgStream = createWriteStream(spillPath);
+        bgStream.write(partial);
+        // New data events will now append to bgStream via collect()
+
+        const bgSec = Math.round(backgroundAfterMs / 1000);
+        const preview = partial.trimEnd();
+        let output = preview ? `${preview}\n\n` : "";
+        output += [
+          `⏳ Command backgrounded — still running after ${bgSec}s (PID ${proc.pid}).`,
+          `Output is being written to: ${spillPath}`,
+          `• View output so far → read tool on that file`,
+          `• Check if still running → bash "kill -0 ${proc.pid} 2>/dev/null && echo running || echo exited"`,
+          `• Wait for it to finish → bash with command "tail -f ${spillPath}" and await=N (where N is how long you're willing to wait in seconds, prevents hangs)`,
+          `• Stop it → bash "kill ${proc.pid}"`,
+        ].join("\n");
+
+        resolve({ output, isError: false });
+      }, backgroundAfterMs);
+    }
+
     proc.on("error", (err) => {
+      if (bgTimer) clearTimeout(bgTimer);
       if (settled) return;
       settled = true;
       resolve({ output: `Error: ${err.message}`, isError: true });
     });
 
-    proc.on("close", (code, sig) => {
+    proc.on("close", (code, _sig) => {
+      if (bgTimer) clearTimeout(bgTimer);
+
+      // If backgrounded, append exit status to the temp file and close
+      if (bgStream) {
+        if (code !== 0 && code !== null) {
+          bgStream.write(`\n[process exited with code ${code}]\n`);
+        } else {
+          bgStream.write(`\n[process exited successfully]\n`);
+        }
+        bgStream.end();
+        bgStream = undefined;
+        return;
+      }
+
       if (settled) return;
       settled = true;
 
@@ -193,10 +289,11 @@ export const bash: Tool = {
     properties: {
       command: { type: "string", description: "The bash command to execute" },
       timeout: { type: "number", description: "Timeout in milliseconds (default 3600000)" },
+      await: { type: "number", description: "Seconds to wait before backgrounding this command. Use when you expect a command to take longer than the default threshold (e.g. builds, installs, watching a backgrounded process)." },
     },
     required: ["command"],
   },
-  systemHint: undefined,
+  systemHint: `Bash commands that run longer than ${TOOL_BACKGROUND_SECONDS}s are automatically backgrounded: the process keeps running but control returns to you with the PID and a temp file where output accumulates. Pass the "await" parameter (seconds) to suppress backgrounding when you expect a command to take longer (builds, installs, sleeps, tailing a backgrounded process).`,
   display: {
     label: "$",
     color: "#d19a66",  // muted amber

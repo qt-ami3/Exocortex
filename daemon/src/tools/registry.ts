@@ -8,7 +8,7 @@ import type { Tool, ToolResult, ToolSummary } from "./types";
 import type { ToolDisplayInfo } from "@exocortex/shared/messages";
 import type { ApiToolCall } from "../api";
 import type { ToolExecResult } from "../agent";
-import { bash } from "./bash";
+import { bash, executeBashBackgroundable } from "./bash";
 import { read } from "./read";
 import { write } from "./write";
 import { glob } from "./glob";
@@ -16,6 +16,7 @@ import { grep } from "./grep";
 import { edit } from "./edit";
 import { browse } from "./browse";
 import { context, executeContext, type ContextToolEnv } from "./context";
+import { TOOL_BACKGROUND_SECONDS } from "../constants";
 
 export type { ContextToolEnv };
 
@@ -91,6 +92,39 @@ function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
   ]);
 }
 
+// ── Execute + abort-race wrapper ──────────────────────────────────
+
+/**
+ * Run a tool promise with abort-race support. Handles:
+ * - Racing the promise against the AbortSignal
+ * - AbortError → friendly "User interrupted" message
+ * - Unexpected errors → "Tool error" message
+ * - Building the ToolExecResult envelope
+ */
+async function execTool(
+  call: ApiToolCall,
+  promise: Promise<ToolResult>,
+  signal?: AbortSignal,
+): Promise<ToolExecResult> {
+  const startTime = Date.now();
+  try {
+    const result = await raceAbort(promise, signal);
+    return {
+      toolCallId: call.id,
+      toolName: call.name,
+      output: result.output,
+      isError: result.isError,
+      image: result.image,
+    };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      return { toolCallId: call.id, toolName: call.name, output: `User interrupted after ${elapsed}s of execution.`, isError: false };
+    }
+    return { toolCallId: call.id, toolName: call.name, output: `Tool error: ${err instanceof Error ? err.message : String(err)}`, isError: true };
+  }
+}
+
 // ── Build executor (injected into the agent loop) ──────────────────
 
 export function buildExecutor(
@@ -99,53 +133,19 @@ export function buildExecutor(
   return (calls, signal?) => Promise.all(calls.map(async (call): Promise<ToolExecResult> => {
     // Context tool — needs conversation access, bypass normal execute()
     if (call.name === "context" && contextEnv) {
-      const startTime = Date.now();
-      try {
-        const result = await raceAbort(
-          executeContext(call.input, contextEnv, signal),
-          signal,
-        );
-        return {
-          toolCallId: call.id,
-          toolName: call.name,
-          output: result.output,
-          isError: result.isError,
-        };
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") {
-          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-          return { toolCallId: call.id, toolName: call.name, output: `User interrupted after ${elapsed}s of execution.`, isError: false };
-        }
-        return { toolCallId: call.id, toolName: call.name, output: `Tool error: ${err instanceof Error ? err.message : String(err)}`, isError: true };
-      }
+      return execTool(call, executeContext(call.input, contextEnv, signal), signal);
+    }
+
+    // Bash tool — use backgroundable executor so long-running commands
+    // are detached after TOOL_BACKGROUND_SECONDS instead of blocking.
+    if (call.name === "bash") {
+      return execTool(call, executeBashBackgroundable(call.input, signal, TOOL_BACKGROUND_SECONDS * 1000), signal);
     }
 
     const tool = toolMap.get(call.name);
-    let result: ToolResult;
     if (!tool) {
-      result = { output: `Unknown tool: ${call.name}`, isError: true };
-    } else {
-      const startTime = Date.now();
-      try {
-        result = await raceAbort(tool.execute(call.input, signal), signal);
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") {
-          // Fallback for tools that don't handle the signal cooperatively.
-          // Tools like bash resolve before the race fires, so this only
-          // triggers for tools that didn't settle on their own.
-          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-          result = { output: `User interrupted after ${elapsed}s of execution.`, isError: false };
-        } else {
-          result = { output: `Tool error: ${err instanceof Error ? err.message : String(err)}`, isError: true };
-        }
-      }
+      return { toolCallId: call.id, toolName: call.name, output: `Unknown tool: ${call.name}`, isError: true };
     }
-    return {
-      toolCallId: call.id,
-      toolName: call.name,
-      output: result.output,
-      isError: result.isError,
-      image: result.image,
-    };
+    return execTool(call, tool.execute(call.input, signal), signal);
   }));
 }
