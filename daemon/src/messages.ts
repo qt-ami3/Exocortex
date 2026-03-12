@@ -76,14 +76,29 @@ export function displayName(conv: Conversation): string {
  *
  * Used to distinguish "real" user messages from the tool_result
  * containers the API requires between tool_use and the next
- * assistant turn.  Note: display.ts intentionally uses `some()`
- * instead — it needs to extract tool_result blocks from mixed
- * messages (those containing context pressure hints alongside
- * tool results).
+ * assistant turn.  Note: display.ts and context.ts's snapRange
+ * use `hasToolResult()` (some) instead — they need to recognise
+ * mixed messages (those containing context pressure hints alongside
+ * tool results) as tool-result turns.
  */
 export function isToolResultOnly(msg: StoredMessage): boolean {
   if (typeof msg.content === "string") return false;
   return msg.content.length > 0 && msg.content.every(b => b.type === "tool_result");
+}
+
+/**
+ * True if a message contains at least one tool_result block.
+ *
+ * Unlike `isToolResultOnly`, this returns true for mixed messages
+ * that have tool_result blocks alongside other block types (e.g.
+ * context pressure hint text blocks injected by the agent loop).
+ * Used by the context tool's snapRange to correctly protect
+ * tool_use/tool_result pairs even when the tool_result message
+ * has been augmented with non-tool_result content.
+ */
+export function hasToolResult(msg: StoredMessage): boolean {
+  if (typeof msg.content === "string") return false;
+  return msg.content.some(b => b.type === "tool_result");
 }
 
 export function createConversation(id: string, model: ModelId, sortOrder?: number): Conversation {
