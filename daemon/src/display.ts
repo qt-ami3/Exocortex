@@ -9,6 +9,7 @@
 import type { Block, MessageMetadata, ImageAttachment } from "./messages";
 import type { StoredMessage, ApiContentBlock } from "./messages";
 import type { ModelId } from "./messages";
+import { isToolResultMessage } from "./messages";
 import type { DisplayEntry } from "@exocortex/shared/protocol";
 
 export type { DisplayEntry };
@@ -101,8 +102,7 @@ export function buildDisplayData(
     if (msg.role === "user") {
       if (typeof msg.content !== "string") {
         const contentArr = msg.content as ApiContentBlock[];
-        const hasToolResults = contentArr.some((c) => c.type === "tool_result");
-        if (hasToolResults && currentAI) {
+        if (isToolResultMessage(msg) && currentAI) {
           // Extract only tool_result blocks — text blocks are context
           // pressure hints injected for the AI and not shown in the TUI.
           const toolResults = contentArr.filter((c) => c.type === "tool_result");
