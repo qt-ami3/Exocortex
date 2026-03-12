@@ -12,8 +12,11 @@ import type { RenderState } from "./state";
 
 // ── Prompt ─────────────────────────────────────────────────────────
 
-const SYSTEM = `You generate short conversation titles. Output ONLY the title — 3 to 4 lowercase words, no quotes, no punctuation, no explanation. Match this naming style:
-exo bash truncate, exo code qa, berlin airbnb, tokens bug, context tool, unbricking convo, merging img pasting, netherlands trains, exo vim linewrapping, exo msg queuing, fixing message queuing, airpods pro autoconnect, discord streaming, context management`;
+const INSTRUCTION = `You generate short conversation titles. Output ONLY the title — 3 to 4 lowercase words, no quotes, no punctuation, no explanation. Match this naming style:
+exo bash truncate, exo code qa, berlin airbnb, tokens bug, context tool, unbricking convo, merging img pasting, netherlands trains, exo vim linewrapping, exo msg queuing, fixing message queuing, airpods pro autoconnect, discord streaming, context management
+
+Here is the conversation to generate a title for:
+<prompt>`;
 
 // Must exceed the thinking budget (10000) configured in api.ts for
 // non-adaptive models — otherwise all tokens go to thinking and the
@@ -51,10 +54,11 @@ export function generateTitle(
   daemon: DaemonClient,
   scheduleRender: () => void,
 ): void {
-  const prompt = extractUserContext(state);
+  const context = extractUserContext(state);
+  const prompt = `${INSTRUCTION}\n${context}\n</prompt>`;
 
   daemon.llmComplete(
-    SYSTEM,
+    "",
     prompt,
     (generatedTitle) => {
       const title = generatedTitle.trim().toLowerCase().replace(/["""''`.]/g, "");
