@@ -13,10 +13,7 @@ import type { RenderState } from "./state";
 // ── Prompt ─────────────────────────────────────────────────────────
 
 const INSTRUCTION = `You generate short conversation titles. Output ONLY the title — 3 to 4 lowercase words, no quotes, no punctuation, no explanation. Match this naming style:
-exo bash truncate, exo code qa, berlin airbnb, tokens bug, context tool, unbricking convo, merging img pasting, netherlands trains, exo vim linewrapping, exo msg queuing, fixing message queuing, airpods pro autoconnect, discord streaming, context management
-
-Here is the conversation to generate a title for:
-<prompt>`;
+exo bash truncate, exo code qa, berlin airbnb, tokens bug, context tool, unbricking convo, merging img pasting, netherlands trains, exo vim linewrapping, exo msg queuing, fixing message queuing, airpods pro autoconnect, discord streaming, context management`;
 
 // Must exceed the thinking budget (10000) configured in api.ts for
 // non-adaptive models — otherwise all tokens go to thinking and the
@@ -55,7 +52,7 @@ export function generateTitle(
   scheduleRender: () => void,
 ): void {
   const context = extractUserContext(state);
-  const prompt = `${INSTRUCTION}\n${context}\n</prompt>`;
+  const prompt = `${INSTRUCTION}\n\nHere is the conversation to generate a title for:\n<prompt>\n${context}\n</prompt>`;
 
   daemon.llmComplete(
     "",
