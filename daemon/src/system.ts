@@ -2,10 +2,29 @@
  * System prompt for exocortexd.
  *
  * Builds the system prompt sent to the Anthropic API.
- * Base prompt + per-tool hints composed from the registry.
+ * Base prompt + per-tool hints from the registry + optional
+ * user addendum from ~/.config/exocortex/system.md.
  */
 
+import { readFileSync } from "fs";
+import { join } from "path";
 import { buildToolSystemHints } from "./tools/registry";
+import { configDir } from "@exocortex/shared/paths";
+
+// ── User system prompt addendum ───────────────────────────────────
+
+let _userAddendum: string = "";
+
+function loadUserAddendum(): void {
+  try {
+    _userAddendum = readFileSync(join(configDir(), "system.md"), "utf8").trim();
+  } catch {
+    _userAddendum = "";
+  }
+}
+loadUserAddendum();
+
+// ── Build ─────────────────────────────────────────────────────────
 
 export function buildSystemPrompt(): string {
   const cwd = process.cwd();
@@ -22,6 +41,12 @@ export function buildSystemPrompt(): string {
     `- Platform: ${process.platform} ${process.arch}`,
   ].join("\n");
 
+  const parts = [base];
+
   const toolHints = buildToolSystemHints();
-  return toolHints ? `${base}\n\n${toolHints}` : base;
+  if (toolHints) parts.push(toolHints);
+
+  if (_userAddendum) parts.push(_userAddendum);
+
+  return parts.join("\n\n");
 }
