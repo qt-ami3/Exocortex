@@ -276,7 +276,7 @@ async function executeBashImpl(
 
 function summarize(input: Record<string, unknown>): ToolSummary {
   const command = getString(input, "command") ?? "";
-  return { label: "$", detail: command.slice(0, 200) };
+  return { label: "$", detail: command };
 }
 
 // ── Tool definition ────────────────────────────────────────────────
