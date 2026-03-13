@@ -80,19 +80,48 @@ function renderBlock(block: Block, contentWidth: number, toolRegistry: ToolDispl
     }
     case "tool_call": {
       const display = resolveToolDisplay(block.toolName, block.summary, toolRegistry);
-      // Wrap the plain text, then apply colors per line
-      const plainText = display.detail ? `${display.label} ${display.detail}` : display.label;
-      const w = wordWrap(plainText, contentWidth - 2);
-      for (let i = 0; i < w.lines.length; i++) {
-        if (i === 0) {
-          // First line: bold label + detail
-          const labelLen = display.label.length;
-          const rest = w.lines[0].slice(labelLen);
-          lines.push(`  ${display.fg}${theme.bold}${display.label}${theme.reset}${display.fg}${rest}${theme.reset}`);
-        } else {
-          lines.push(`  ${display.fg}${w.lines[i]}${theme.reset}`);
+
+      // Build logical display lines. Each entry: { text, hasLabel }.
+      // hasLabel tracks structurally whether the line starts with a
+      // bold label — avoids fragile string-content matching later.
+      const logical: { text: string; hasLabel: boolean }[] = [];
+
+      if (display.cmd && display.detail) {
+        // User-styled bash: re-apply label to subsequent lines that
+        // invoke the same command prefix.
+        const cmd = display.cmd;
+        for (const [i, line] of display.detail.split("\n").entries()) {
+          if (i === 0) {
+            logical.push({ text: `${display.label} ${line}`, hasLabel: true });
+          } else {
+            const t = line.trimStart();
+            if (t === cmd || t.startsWith(cmd + " ")) {
+              const args = t.slice(cmd.length).trimStart();
+              logical.push({ text: `${display.label} ${args}`, hasLabel: true });
+            } else {
+              logical.push({ text: line, hasLabel: false });
+            }
+          }
         }
-        cont.push(w.cont[i]);
+      } else {
+        // Default: single logical line with the label prepended.
+        const text = display.detail ? `${display.label} ${display.detail}` : display.label;
+        logical.push({ text, hasLabel: true });
+      }
+
+      // Wrap and colorize all logical lines uniformly.
+      for (const entry of logical) {
+        const w = wordWrap(entry.text, contentWidth - 2);
+        for (let j = 0; j < w.lines.length; j++) {
+          // Bold label on the first visual line of a label-bearing logical line.
+          if (entry.hasLabel && j === 0) {
+            const rest = w.lines[0].slice(display.label.length);
+            lines.push(`  ${display.fg}${theme.bold}${display.label}${theme.reset}${display.fg}${rest}${theme.reset}`);
+          } else {
+            lines.push(`  ${display.fg}${w.lines[j]}${theme.reset}`);
+          }
+          cont.push(w.cont[j]);
+        }
       }
       break;
     }

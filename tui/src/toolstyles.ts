@@ -30,6 +30,8 @@ export interface ResolvedToolDisplay {
   label: string;
   detail: string;
   fg: string;     // ANSI truecolor escape
+  /** Original command prefix that matched (user styles only). Used for multi-line re-application. */
+  cmd?: string;
 }
 
 // ── User overrides ─────────────────────────────────────────────────
@@ -47,6 +49,50 @@ function loadUserStyles(): void {
   }
 }
 loadUserStyles();
+
+/**
+ * Try to match a command string against a single user style entry.
+ * Returns resolved display if the command starts with the key.
+ */
+function tryMatch(command: string, cmd: string, style: UserToolStyle): ResolvedToolDisplay | null {
+  if (command === cmd || command.startsWith(cmd + " ") || command.startsWith(cmd + "\n")) {
+    const detail = command.slice(cmd.length).trimStart();
+    return { label: style.label, detail, fg: hexToAnsi(style.color), cmd };
+  }
+  return null;
+}
+
+/**
+ * Match a bash command summary against user-defined tool styles.
+ *
+ * First tries matching the trimmed command directly. If that fails,
+ * skips leading comment lines (# ...) and blank lines, then retries
+ * against the first real command line. This handles cases where the
+ * AI prepends comments like "# Fetch latest mentions\ngmail ...".
+ */
+function matchUserStyle(summary: string): ResolvedToolDisplay | null {
+  const trimmed = summary.trimStart();
+  for (const [cmd, style] of Object.entries(userStyles)) {
+    const m = tryMatch(trimmed, cmd, style);
+    if (m) return m;
+  }
+
+  // Retry: skip leading comment and blank lines
+  const lines = trimmed.split("\n");
+  const firstCmd = lines.findIndex(l => {
+    const t = l.trimStart();
+    return t !== "" && !t.startsWith("#");
+  });
+  if (firstCmd > 0) {
+    const cmdLine = lines[firstCmd].trimStart();
+    for (const [cmd, style] of Object.entries(userStyles)) {
+      const m = tryMatch(cmdLine, cmd, style);
+      if (m) return m;
+    }
+  }
+
+  return null;
+}
 
 // ── Resolution ─────────────────────────────────────────────────────
 
@@ -66,13 +112,8 @@ export function resolveToolDisplay(
 
   // Bash: check user overrides for sub-command matching
   if (toolName === "bash") {
-    const trimmed = summary.trimStart();
-    for (const [cmd, style] of Object.entries(userStyles)) {
-      if (trimmed === cmd || trimmed.startsWith(cmd + " ") || trimmed.startsWith(cmd + "\n")) {
-        const detail = trimmed.slice(cmd.length).trimStart();
-        return { label: style.label, detail, fg: hexToAnsi(style.color) };
-      }
-    }
+    const match = matchUserStyle(summary);
+    if (match) return match;
   }
 
   // Use daemon-provided registry
