@@ -16,6 +16,7 @@
  *   exo abort <id>                  Abort in-flight stream
  *   exo rename <id> <title>         Rename a conversation
  *   exo llm "text" --system "..."   One-shot LLM completion
+ *   exo status                      Check daemon health
  *
  * Flags:
  *   --opus, --sonnet, --haiku       Model selection
@@ -29,13 +30,13 @@
  */
 
 import { Connection } from "./conn";
-import { send, ls, info, history, rm, abort, rename, llm, type OutputOptions } from "./commands";
+import { send, ls, info, history, rm, abort, rename, llm, status, type OutputOptions } from "./commands";
 import { printHelp, printCommandHelp, hasCommandHelp } from "./help";
 import type { ModelId } from "@exocortex/shared/protocol";
 
 // ── Arg parsing ─────────────────────────────────────────────────────
 
-const SUBCOMMANDS = new Set(["ls", "info", "history", "rm", "abort", "rename", "llm", "help"]);
+const SUBCOMMANDS = new Set(["ls", "info", "history", "rm", "abort", "rename", "llm", "status", "help"]);
 
 interface ParsedArgs {
   subcommand: string | null;
@@ -170,6 +171,9 @@ async function main(): Promise<number> {
     switch (args.subcommand) {
       case "ls":
         return await ls(conn, opts);
+
+      case "status":
+        return await status(conn, opts);
 
       case "info": {
         const convId = args.positionals[0];

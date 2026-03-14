@@ -44,6 +44,12 @@ export function collectResponse(
       reject(new Error("Timeout waiting for response"));
     }, timeoutMs);
 
+    // Stderr hint if the response is taking a while. Useful for humans
+    // watching; harmless for scripts (goes to stderr, not stdout).
+    const waitHint = setTimeout(() => {
+      process.stderr.write("waiting for response…\n");
+    }, 5_000);
+
     const handler = (event: Event) => {
       // Only care about events for our conversation
       if (!("convId" in event) || event.convId !== convId) return;
@@ -77,6 +83,7 @@ export function collectResponse(
 
     const cleanup = () => {
       clearTimeout(timer);
+      clearTimeout(waitHint);
       conn.offEvent(handler);
     };
 

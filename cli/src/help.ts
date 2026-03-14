@@ -24,6 +24,7 @@ ${b("COMMANDS")}
   abort <id>                        Abort in-flight stream
   rename <id> <title>               Rename a conversation
   llm "text" --system "prompt"      One-shot LLM (no conversation)
+  status                            Check if daemon is running
   help                              Show this help
 
 ${b("FLAGS")}
@@ -133,6 +134,22 @@ Rename a conversation.
 
 ${b("USAGE")}
   exo rename <convId> "new title"
+`,
+
+  status: `${b("exo status")} [flags]
+
+Check if the daemon is running and show a quick summary.
+
+${b("USAGE")}
+  exo status
+  exo status --json
+
+${b("FLAGS")}
+  --json                            Output as JSON object
+
+${b("OUTPUT")}
+  Daemon latency, conversation count, active streams.
+  Exit code 2 if daemon is not running.
 `,
 
   llm: `${b("exo llm")} "text" [flags]

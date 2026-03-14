@@ -6,6 +6,7 @@
 import type { Connection } from "./conn";
 import type {
   ModelId,
+  PongEvent,
   ConversationCreatedEvent,
   ConversationsListEvent,
   ConversationLoadedEvent,
@@ -261,6 +262,48 @@ export async function llm(
     process.stdout.write(JSON.stringify({ text: event.text }) + "\n");
   } else {
     process.stdout.write(event.text + "\n");
+  }
+
+  return 0;
+}
+
+// ── status ─────────────────────────────────────────────────────────
+
+export async function status(conn: Connection, opts: OutputOptions): Promise<number> {
+  const reqId = nextReqId();
+  const startedAt = Date.now();
+
+  await conn.request<PongEvent>(
+    { type: "ping", reqId },
+    (e): e is PongEvent => e.type === "pong" && e.reqId === reqId,
+    5_000,
+  );
+
+  const latencyMs = Date.now() - startedAt;
+
+  // Also fetch conversation count for a useful summary
+  const listReqId = nextReqId();
+  const listEvent = await conn.request<ConversationsListEvent>(
+    { type: "list_conversations", reqId: listReqId },
+    (e): e is ConversationsListEvent => e.type === "conversations_list" && e.reqId === listReqId,
+  );
+
+  const convCount = listEvent.conversations.length;
+  const streaming = listEvent.conversations.filter((c) => c.streaming).length;
+
+  if (opts.json) {
+    process.stdout.write(JSON.stringify({
+      status: "ok",
+      latencyMs,
+      conversations: convCount,
+      streaming,
+    }) + "\n");
+  } else {
+    process.stdout.write(`Daemon:        online (${latencyMs}ms)\n`);
+    process.stdout.write(`Conversations: ${convCount}\n`);
+    if (streaming > 0) {
+      process.stdout.write(`Streaming:     ${streaming} active\n`);
+    }
   }
 
   return 0;
