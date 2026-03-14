@@ -13,7 +13,7 @@ import { streamMessage, type ApiToolCall } from "./api";
 import { log } from "./log";
 import type { ModelId, Block, ToolCallBlock, ToolResultBlock, ApiMessage, ApiContentBlock } from "./messages";
 import { MAX_OUTPUT_CHARS, cap } from "./tools/util";
-import { CONTEXT_LIMIT, CONTEXT_TARGET } from "./constants";
+import { MAX_CONTEXT, CONTEXT_TARGET } from "./constants";
 
 // ── Callbacks ───────────────────────────────────────────────────────
 
@@ -133,11 +133,13 @@ export async function runAgentLoop(
   let totalOutputTokens = 0;
   let lastInputTokens = 0;
 
-  // Context pressure thresholds — injected as text blocks in tool result messages
+  // Context pressure thresholds — injected as text blocks in tool result messages.
+  // Kept deliberately low to combat "context rot": models perform best when
+  // their context is not bloated. Every level targets 100K.
   const THRESHOLDS = [
-    { at: 128_000, level: "advisory" as const },
-    { at: 164_000, level: "warning" as const },
-    { at: 188_000, level: "critical" as const },
+    { at: 200_000, level: "advisory" as const },
+    { at: 400_000, level: "warning" as const },
+    { at: 600_000, level: "critical" as const },
   ];
   let highestFiredLevel = -1; // index into THRESHOLDS, -1 = none fired
 
@@ -277,8 +279,9 @@ export async function runAgentLoop(
     // usage crosses hardcoded thresholds. The AI sees this alongside
     // tool results; the TUI renders them inline as dimmed text.
     if (lastInputTokens > 0) {
-      const pct = ((lastInputTokens / CONTEXT_LIMIT) * 100).toFixed(0);
-      const usage = `${Math.round(lastInputTokens / 1000)}k/${CONTEXT_LIMIT / 1000}k tokens (${pct}%)`;
+      const contextLimit = MAX_CONTEXT[model];
+      const pct = ((lastInputTokens / contextLimit) * 100).toFixed(0);
+      const usage = `${Math.round(lastInputTokens / 1000)}k/${contextLimit / 1000}k tokens (${pct}%)`;
       const freeAtLeast = `${Math.round((lastInputTokens - CONTEXT_TARGET) / 1000)}k`;
       const target = `${CONTEXT_TARGET / 1000}k`;
       let hint: string | null = null;
