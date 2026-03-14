@@ -8,9 +8,9 @@ import type { ModelId } from "../messages";
 import { theme } from "../theme";
 
 const MAX_CONTEXT: Record<ModelId, number> = {
-  sonnet: 200_000,
-  haiku: 200_000,
-  opus: 200_000,
+  sonnet: 1_000_000,
+  haiku: 1_000_000,
+  opus: 1_000_000,
 };
 
 function formatTokenCount(n: number): string {
@@ -18,7 +18,7 @@ function formatTokenCount(n: number): string {
 }
 
 export function contextBlock(state: RenderState): StatusBlock | null {
-  const maxCtx = MAX_CONTEXT[state.model] ?? 200_000;
+  const maxCtx = MAX_CONTEXT[state.model] ?? 1_000_000;
   const ctxLabel = "  Context: ";
   const ctxValue = formatTokenCount(state.contextTokens ?? 0);
   const maxLabel = "  Max Context: ";
