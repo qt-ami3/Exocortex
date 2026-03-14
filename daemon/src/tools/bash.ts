@@ -113,13 +113,27 @@ async function executeBash(input: Record<string, unknown>, signal?: AbortSignal)
  * Called directly by the registry (bypassing Tool.execute) so it can
  * inject the default background timeout from TOOL_BACKGROUND_SECONDS.
  */
+// Commands that are expected to take a long time (subagent calls, etc).
+// When one of these is detected and no explicit `await` is set, the
+// background threshold is raised to 30 minutes instead of the default 60s.
+const LONG_RUNNING_COMMANDS = ["exo ","exo\n","cat <<", "cat<<"];
+const LONG_RUNNING_BG_MS = 30 * 60 * 1000; // 30 minutes
+
 export async function executeBashBackgroundable(
   input: Record<string, unknown>,
   signal?: AbortSignal,
   defaultBgMs?: number,
 ): Promise<ToolResult> {
   const awaitSeconds = getNumber(input, "await");
-  const bgMs = awaitSeconds ? awaitSeconds * 1000 : defaultBgMs;
+  let bgMs: number | undefined;
+  if (awaitSeconds) {
+    bgMs = awaitSeconds * 1000;
+  } else {
+    const command = getString(input, "command") ?? "";
+    const cmdTrimmed = command.trimStart();
+    const isLongRunning = LONG_RUNNING_COMMANDS.some(prefix => cmdTrimmed.startsWith(prefix));
+    bgMs = isLongRunning ? LONG_RUNNING_BG_MS : defaultBgMs;
+  }
   return executeBashImpl(input, signal, bgMs);
 }
 
