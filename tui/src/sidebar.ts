@@ -10,6 +10,7 @@ import type { ConversationSummary } from "./messages";
 import { sortConversations, convDisplayName, bottomPinnedOrder, topUnpinnedOrder } from "./messages";
 import { resolveAction } from "./keybinds";
 import { theme } from "./theme";
+import { getMarkFromTitle, stripMark, toggleMark } from "./marks";
 
 // ── Constants ───────────────────────────────────────────────────────
 
@@ -45,6 +46,7 @@ export type SidebarKeyResult =
   | { type: "delete_conversation"; convId: string }
   | { type: "undo_delete" }
   | { type: "mark_conversation"; convId: string; marked: boolean }
+  | { type: "rename_conversation"; convId: string; title: string }
   | { type: "pin_conversation"; convId: string; pinned: boolean }
   | { type: "move_conversation"; convId: string; direction: "up" | "down" }
   | { type: "clone_conversation"; convId: string }
@@ -112,15 +114,9 @@ export function handleSidebarAction(action: string, sidebar: SidebarState): Side
       return { type: "clone_conversation", convId: conv.id };
     }
 
-    case "mark": {
-      if (sidebar.conversations.length === 0) return { type: "handled" };
-      const conv = sidebar.conversations[sidebar.selectedIndex];
-      if (!conv) return { type: "handled" };
-      // Optimistic toggle
-      const newMarked = !conv.marked;
-      conv.marked = newMarked;
-      return { type: "mark_conversation", convId: conv.id, marked: newMarked };
-    }
+    case "mark":
+      // Legacy star toggle — clear emoji mark instead (same as pressing 0)
+      return handleSidebarMark(sidebar, 0);
 
     case "pin": {
       if (sidebar.conversations.length === 0) return { type: "handled" };
@@ -201,6 +197,26 @@ function moveToStreaming(sidebar: SidebarState, delta: 1 | -1): void {
       return;
     }
   }
+}
+
+// ── Emoji marks ────────────────────────────────────────────────────
+
+/**
+ * Toggle an emoji mark on the selected conversation.
+ * key 1-9 sets (or toggles off) the corresponding mark.
+ * key 0 clears any mark.
+ */
+export function handleSidebarMark(sidebar: SidebarState, key: number): SidebarKeyResult {
+  if (sidebar.conversations.length === 0) return { type: "handled" };
+  const conv = sidebar.conversations[sidebar.selectedIndex];
+  if (!conv) return { type: "handled" };
+
+  const newTitle = toggleMark(conv.title, key);
+  if (newTitle === conv.title) return { type: "handled" };
+
+  // Optimistic update
+  conv.title = newTitle;
+  return { type: "rename_conversation", convId: conv.id, title: newTitle };
 }
 
 // ── State updates ───────────────────────────────────────────────────
@@ -362,9 +378,16 @@ export function renderSidebar(
     const streamIconColor = conv.streaming ? theme.accent : conv.unread ? theme.success : "";
 
     const prefix = isSelected ? "▸ " : "  ";
-    const markIcon = conv.marked ? "★ " : "";
-    const maxTitle = innerWidth - prefix.length - streamIcon.length - markIcon.length;
-    let title = convDisplayName(conv, "(empty)");
+
+    // Emoji mark: extracted from title prefix (e.g. "🕐 my convo" → "🕐")
+    const mark = getMarkFromTitle(conv.title);
+    const markIcon = mark ? mark.emoji + " " : "";
+    // Terminal width: emoji = 2 cols + space = 1 col = 3; string .length may differ
+    const markIconWidth = mark ? mark.width + 1 : 0;
+
+    const maxTitle = innerWidth - prefix.length - streamIcon.length - markIconWidth;
+    // Strip the emoji prefix from the display name (it's rendered separately)
+    let title = mark ? stripMark(convDisplayName(conv, "(empty)")) : convDisplayName(conv, "(empty)");
     if (title.length > maxTitle) title = title.slice(0, maxTitle - 1) + "…";
 
     const bg = isSelected ? theme.sidebarSelBg : theme.sidebarBg;
@@ -372,7 +395,7 @@ export function renderSidebar(
     const titleText = isCurrent && !isPendingDelete ? theme.bold + title + theme.boldOff : title;
     const streamIconColored = streamIcon ? streamIconColor + streamIcon + fg : "";
     const markIconColored = markIcon ? theme.warning + markIcon + fg : "";
-    const plainLen = prefix.length + streamIcon.length + markIcon.length + title.length;
+    const plainLen = prefix.length + streamIcon.length + markIconWidth + title.length;
     const padding = Math.max(0, innerWidth - plainLen);
 
     rows.push(

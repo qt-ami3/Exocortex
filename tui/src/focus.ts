@@ -22,7 +22,7 @@ import {
   scrollPageUp, scrollPageDown,
   scrollToTop, scrollToBottom,
 } from "./chat";
-import { handleSidebarKey, handleSidebarAction, moveSelection, syncSelectedIndex, type SidebarKeyResult } from "./sidebar";
+import { handleSidebarKey, handleSidebarAction, handleSidebarMark, moveSelection, syncSelectedIndex, type SidebarKeyResult } from "./sidebar";
 import { processKey, copyToClipboard, pasteFromClipboard, type VimContext } from "./vim";
 import { clampNormal } from "./vim/buffer";
 import { pushUndo, markInsertEntry, commitInsertSession, undo as undoFn, redo as redoFn } from "./undo";
@@ -52,6 +52,7 @@ export type KeyResult =
   | { type: "delete_conversation"; convId: string }
   | { type: "undo_delete" }
   | { type: "mark_conversation"; convId: string; marked: boolean }
+  | { type: "rename_conversation"; convId: string; title: string }
   | { type: "pin_conversation"; convId: string; pinned: boolean }
   | { type: "move_conversation"; convId: string; direction: "up" | "down" }
   | { type: "clone_conversation"; convId: string }
@@ -203,6 +204,15 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
   // computes the normal-mode cursor position.
   if (key.type === "escape" && state.autocomplete) {
     dismissAutocomplete(state);
+  }
+
+  // ── Sidebar marks (digit keys) — intercept before vim count prefix ──
+  // Digits 1-9 would be consumed as vim count prefixes, so we handle
+  // them here for the sidebar where they toggle emoji marks on titles.
+  if (state.panelFocus === "sidebar" && state.sidebar.open
+      && state.vim.mode === "normal"
+      && key.type === "char" && key.char && /^[0-9]$/.test(key.char)) {
+    return mapSidebarResult(handleSidebarMark(state.sidebar, parseInt(key.char, 10)));
   }
 
   // ── Vim processing ─────────────────────────────────────────────
@@ -403,8 +413,8 @@ function mapSidebarResult(result: SidebarKeyResult): KeyResult {
       return { type: "handled" };
     default:
       // Remaining variants (delete_conversation, undo_delete, mark_conversation,
-      // pin_conversation, move_conversation, clone_conversation) are directly
-      // valid KeyResult types — forward as-is.
+      // rename_conversation, pin_conversation, move_conversation,
+      // clone_conversation) are directly valid KeyResult types — forward as-is.
       return result;
   }
 }

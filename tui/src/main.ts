@@ -225,6 +225,9 @@ function handleKey(key: KeyEvent): void {
     case "mark_conversation":
       daemon.markConversation(result.convId, result.marked);
       break;
+    case "rename_conversation":
+      daemon.renameConversation(result.convId, result.title);
+      break;
     case "pin_conversation":
       daemon.pinConversation(result.convId, result.pinned);
       break;

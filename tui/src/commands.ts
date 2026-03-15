@@ -15,6 +15,7 @@ import type { ModelId } from "./messages";
 import { convDisplayName } from "./messages";
 import { copyToClipboard } from "./vim/clipboard";
 import { PENDING_TITLE } from "./titlegen";
+import { getMarkPrefix, MARKS } from "./marks";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -52,9 +53,11 @@ function formatConvoInfo(state: RenderState): string | null {
   const msgs = conv?.messageCount ?? state.messages.filter(m => m.role !== "system").length;
   const created = conv ? new Date(conv.createdAt).toLocaleString() : "unknown";
   const updated = conv ? new Date(conv.updatedAt).toLocaleString() : "unknown";
+  const markInfo = conv ? getMarkPrefix(conv.title) : null;
+  const markLabel = markInfo ? MARKS.find(m => m.emoji === markInfo)?.label ?? "marked" : null;
   const flags = [
     conv?.pinned && "pinned",
-    conv?.marked && "marked",
+    markLabel,
   ].filter(Boolean).join(", ");
 
   const lines = [
@@ -115,16 +118,19 @@ const commands: SlashCommand[] = [
         clearPrompt(state);
         return { type: "handled" };
       }
-      const title = text.slice("/rename".length).trim();
-      if (!title) {
+      const rawTitle = text.slice("/rename".length).trim();
+      if (!rawTitle) {
         // Auto-generate: set placeholder and request LLM-generated title
         const conv = state.sidebar.conversations.find(c => c.id === state.convId);
         if (conv) conv.title = PENDING_TITLE;
         clearPrompt(state);
         return { type: "generate_title" };
       }
-      // Optimistic update: immediately reflect in sidebar
+      // Preserve any existing emoji mark prefix
       const conv = state.sidebar.conversations.find(c => c.id === state.convId);
+      const markPrefix = conv ? getMarkPrefix(conv.title) : null;
+      const title = markPrefix ? markPrefix + " " + rawTitle : rawTitle;
+      // Optimistic update: immediately reflect in sidebar
       if (conv) conv.title = title;
       clearPrompt(state);
       return { type: "rename_conversation", title };

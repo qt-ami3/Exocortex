@@ -9,6 +9,7 @@
 
 import type { DaemonClient } from "./client";
 import type { RenderState } from "./state";
+import { getMarkPrefix } from "./marks";
 
 // ── Prompt ─────────────────────────────────────────────────────────
 
@@ -54,11 +55,16 @@ export function generateTitle(
   const context = extractUserContext(state);
   const prompt = `${INSTRUCTION}\n\nHere is the conversation to generate a title for:\n<prompt>\n${context}\n</prompt>`;
 
+  // Preserve any emoji mark prefix across title regeneration
+  const existingTitle = state.sidebar.conversations.find(c => c.id === convId)?.title ?? "";
+  const markPrefix = getMarkPrefix(existingTitle);
+
   daemon.llmComplete(
     "",
     prompt,
     (generatedTitle) => {
-      const title = generatedTitle.trim().toLowerCase().replace(/["""''`.]/g, "");
+      let title = generatedTitle.trim().toLowerCase().replace(/["""''`.]/g, "");
+      if (markPrefix) title = markPrefix + " " + title;
       daemon.renameConversation(convId, title);
       const conv = state.sidebar.conversations.find(c => c.id === convId);
       if (conv) conv.title = title;
