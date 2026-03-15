@@ -148,6 +148,7 @@ function buildRequest(
     model: MODEL_IDS[model], messages: injectMessageBreakpoints(messages),
     max_tokens: maxTokens, thinking, stream: true,
     metadata: { user_id: getMetadataUserId() },
+    output_config: { effort: "high" },
   };
   if (tools && tools.length > 0) body.tools = injectToolBreakpoints(tools);
   if (system) {
