@@ -70,7 +70,7 @@ interface BlockCacheEntry {
 
 const blockRenderCache = new WeakMap<Block, BlockCacheEntry>();
 
-/** Return the content string whose length we track for cache invalidation. */
+/** Length of the block's mutable content field — used for cache invalidation. */
 function blockContentKey(block: Block): number {
   switch (block.type) {
     case "thinking":
