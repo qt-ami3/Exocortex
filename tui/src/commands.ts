@@ -56,6 +56,7 @@ function formatConvoInfo(state: RenderState): string | null {
   const markLabel = conv ? getMarkFromTitle(conv.title)?.label ?? null : null;
   const flags = [
     conv?.pinned && "pinned",
+    conv?.marked && "starred",
     markLabel,
   ].filter(Boolean).join(", ");
 

@@ -114,9 +114,14 @@ export function handleSidebarAction(action: string, sidebar: SidebarState): Side
       return { type: "clone_conversation", convId: conv.id };
     }
 
-    case "mark":
-      // Legacy star toggle — clear emoji mark instead (same as pressing 0)
-      return handleSidebarMark(sidebar, 0);
+    case "mark": {
+      if (sidebar.conversations.length === 0) return { type: "handled" };
+      const conv = sidebar.conversations[sidebar.selectedIndex];
+      if (!conv) return { type: "handled" };
+      const newMarked = !conv.marked;
+      conv.marked = newMarked;
+      return { type: "mark_conversation", convId: conv.id, marked: newMarked };
+    }
 
     case "pin": {
       if (sidebar.conversations.length === 0) return { type: "handled" };
@@ -379,13 +384,18 @@ export function renderSidebar(
 
     const prefix = isSelected ? "▸ " : "  ";
 
+    // Star (★) from the boolean `marked` flag — independent of emoji marks
+    const starIcon = conv.marked ? "★ " : "";
+    const starIconWidth = conv.marked ? 2 : 0;
+
     // Emoji mark: extracted from title prefix (e.g. "🕐 my convo" → "🕐")
     const mark = getMarkFromTitle(conv.title);
-    const markIcon = mark ? mark.emoji + " " : "";
-    // Terminal width: emoji = 2 cols + space = 1 col = 3; string .length may differ
-    const markIconWidth = mark ? mark.width + 1 : 0;
+    const emojiIcon = mark ? mark.emoji + " " : "";
+    // Terminal width: emoji = 2 cols + space = 1 col
+    const emojiIconWidth = mark ? mark.width + 1 : 0;
 
-    const maxTitle = innerWidth - prefix.length - streamIcon.length - markIconWidth;
+    const iconsWidth = starIconWidth + emojiIconWidth;
+    const maxTitle = innerWidth - prefix.length - streamIcon.length - iconsWidth;
     // Strip the emoji prefix from the display name (it's rendered separately)
     let title = convDisplayName(conv, "(empty)");
     if (mark) title = stripMark(title);
@@ -395,13 +405,14 @@ export function renderSidebar(
     const fg = isPendingDelete ? theme.error : (isSelected || isCurrent) ? theme.text : theme.muted;
     const titleText = isCurrent && !isPendingDelete ? theme.bold + title + theme.boldOff : title;
     const streamIconColored = streamIcon ? streamIconColor + streamIcon + fg : "";
-    const markIconColored = markIcon ? theme.warning + markIcon + fg : "";
-    const plainLen = prefix.length + streamIcon.length + markIconWidth + title.length;
+    const starIconColored = starIcon ? theme.warning + starIcon + fg : "";
+    const emojiIconColored = emojiIcon ? theme.warning + emojiIcon + fg : "";
+    const plainLen = prefix.length + streamIcon.length + iconsWidth + title.length;
     const padding = Math.max(0, innerWidth - plainLen);
 
     rows.push(
       theme.reset + bg + fg +
-      prefix + streamIconColored + markIconColored + titleText + " ".repeat(padding) +
+      prefix + streamIconColored + starIconColored + emojiIconColored + titleText + " ".repeat(padding) +
       theme.reset + borderFg + "│" + theme.reset,
     );
   }
