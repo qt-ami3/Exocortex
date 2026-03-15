@@ -12,7 +12,36 @@ import type { AIMessage, SystemMessage, ImageAttachment } from "./messages";
 import { updateConversationList, updateConversation, syncSelectedIndex } from "./sidebar";
 import { theme } from "./theme";
 import { clearLocalQueue, removeLocalQueueEntry } from "./queue";
-import type { Event } from "./protocol";
+import type { Event, DisplayEntry } from "./protocol";
+
+// ── Display entry → TUI message conversion ─────────────────────────
+
+/**
+ * Map daemon display entries to TUI message objects and push them
+ * onto state.messages.  Used by both conversation_loaded and
+ * history_updated — keeps the mapping in one place.
+ */
+function pushDisplayEntries(state: RenderState, entries: DisplayEntry[]): void {
+  for (const entry of entries) {
+    switch (entry.type) {
+      case "user":
+        state.messages.push({ role: "user", text: entry.text, images: entry.images, metadata: null });
+        break;
+      case "ai":
+        state.messages.push({
+          role: "assistant",
+          blocks: entry.blocks,
+          metadata: entry.metadata ?? null,
+        });
+        break;
+      case "system": {
+        const color = entry.color === "error" ? theme.error : entry.color === "warning" ? theme.warning : theme.muted;
+        state.messages.push({ role: "system", text: entry.text, color, metadata: null });
+        break;
+      }
+    }
+  }
+}
 
 // ── Daemon actions interface ────────────────────────────────────────
 // Minimal interface so this file doesn't depend on DaemonClient.
@@ -259,25 +288,7 @@ export function handleEvent(
       state.contextTokens = event.contextTokens;
 
       // Entries arrive in display order — just map to TUI message types
-      for (const entry of event.entries) {
-        switch (entry.type) {
-          case "user":
-            state.messages.push({ role: "user", text: entry.text, images: entry.images, metadata: null });
-            break;
-          case "ai":
-            state.messages.push({
-              role: "assistant",
-              blocks: entry.blocks,
-              metadata: entry.metadata ?? { startedAt: 0, endedAt: 0, model: event.model, tokens: 0 },
-            });
-            break;
-          case "system": {
-            const color = entry.color === "error" ? theme.error : entry.color === "warning" ? theme.warning : theme.muted;
-            state.messages.push({ role: "system", text: entry.text, color, metadata: null });
-            break;
-          }
-        }
-      }
+      pushDisplayEntries(state, event.entries);
 
       // Rebuild local queue shadows from daemon state
       clearLocalQueue(state, event.convId);
@@ -365,25 +376,7 @@ export function handleEvent(
       state.messages = [];
       state.systemMessageBuffer = [];
       state.contextTokens = event.contextTokens;
-      for (const entry of event.entries) {
-        switch (entry.type) {
-          case "user":
-            state.messages.push({ role: "user", text: entry.text, images: entry.images, metadata: null });
-            break;
-          case "ai":
-            state.messages.push({
-              role: "assistant",
-              blocks: entry.blocks,
-              metadata: entry.metadata ?? { startedAt: 0, endedAt: 0, model: state.model, tokens: 0 },
-            });
-            break;
-          case "system": {
-            const color = entry.color === "error" ? theme.error : entry.color === "warning" ? theme.warning : theme.muted;
-            state.messages.push({ role: "system", text: entry.text, color, metadata: null });
-            break;
-          }
-        }
-      }
+      pushDisplayEntries(state, event.entries);
       break;
     }
 
