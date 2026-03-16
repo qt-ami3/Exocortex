@@ -30,7 +30,9 @@ export type CommandResult =
   | { type: "new_conversation" }
   | { type: "model_changed"; model: ModelId }
   | { type: "rename_conversation"; title: string }
-  | { type: "generate_title" };
+  | { type: "generate_title" }
+  | { type: "login" }
+  | { type: "logout" };
 
 export interface SlashCommand {
   name: string;
@@ -180,6 +182,22 @@ const commands: SlashCommand[] = [
       state.messages.push({ role: "system", text: "Conversation info copied to clipboard.", metadata: null });
       clearPrompt(state);
       return { type: "handled" };
+    },
+  },
+  {
+    name: "/login",
+    description: "Authenticate with Anthropic",
+    handler: (_text, state) => {
+      clearPrompt(state);
+      return { type: "login" };
+    },
+  },
+  {
+    name: "/logout",
+    description: "Log out and clear credentials",
+    handler: (_text, state) => {
+      clearPrompt(state);
+      return { type: "logout" };
     },
   },
 ];

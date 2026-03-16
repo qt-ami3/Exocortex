@@ -154,6 +154,16 @@ export interface LlmCompleteCommand {
   maxTokens?: number;
 }
 
+export interface LoginCommand {
+  type: "login";
+  reqId?: string;
+}
+
+export interface LogoutCommand {
+  type: "logout";
+  reqId?: string;
+}
+
 export type Command =
   | PingCommand
   | NewConversationCommand
@@ -174,7 +184,9 @@ export type Command =
   | QueueMessageCommand
   | UnqueueMessageCommand
   | UnwindConversationCommand
-  | LlmCompleteCommand;
+  | LlmCompleteCommand
+  | LoginCommand
+  | LogoutCommand;
 
 // ── Events (daemon → client) ────────────────────────────────────────
 
@@ -386,6 +398,14 @@ export interface LlmCompleteResultEvent {
   text: string;
 }
 
+export interface AuthStatusEvent {
+  type: "auth_status";
+  reqId?: string;
+  message: string;
+  /** When set, the TUI should open this URL in the user's browser. */
+  openUrl?: string;
+}
+
 export interface ErrorEvent {
   type: "error";
   reqId?: string;
@@ -422,4 +442,5 @@ export type Event =
   | ToolsAvailableEvent
   | HistoryUpdatedEvent
   | LlmCompleteResultEvent
+  | AuthStatusEvent
   | ErrorEvent;

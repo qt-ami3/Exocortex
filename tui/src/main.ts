@@ -101,6 +101,12 @@ function handleSubmit(): void {
       if (cmdResult.type === "generate_title" && state.convId) {
         generateTitle(state.convId, state, daemon, scheduleRender);
       }
+      if (cmdResult.type === "login") {
+        daemon.login();
+      }
+      if (cmdResult.type === "logout") {
+        daemon.logout();
+      }
       scheduleRender();
       return;
     }
