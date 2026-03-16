@@ -28,7 +28,7 @@ export function renderTopbar(state: RenderState, width?: number): string {
   const title = `${theme.bold} Exocortex${theme.reset}${theme.topbarBg}`;
   const modelLabel = state.model.charAt(0).toUpperCase() + state.model.slice(1);
   const conv = state.convId ? state.sidebar.conversations.find(c => c.id === state.convId) : null;
-  const effortLabel = conv?.effort === "max" ? " ⚡MAX" : "";
+  const effortLabel = conv?.effort && conv.effort !== "high" ? ` ⚡${conv.effort.toUpperCase()}` : "";
   const label = convLabel(state);
   const separator = label ? " — " : "";
 

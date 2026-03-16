@@ -11,7 +11,7 @@
 import type { RenderState } from "./state";
 import { clearPendingAI } from "./state";
 import { clearPrompt } from "./promptline";
-import { DEFAULT_EFFORT, type ModelId, type EffortLevel } from "./messages";
+import { DEFAULT_EFFORT, EFFORT_LEVELS, type ModelId, type EffortLevel } from "./messages";
 import { convDisplayName } from "./messages";
 import { copyToClipboard } from "./vim/clipboard";
 import { PENDING_TITLE } from "./titlegen";
@@ -165,9 +165,10 @@ const commands: SlashCommand[] = [
     },
   },
   {
-    name: "/max",
-    description: "Toggle max reasoning effort",
-    handler: (_text, state) => {
+    name: "/effort",
+    description: "Set or show reasoning effort level",
+    args: EFFORT_LEVELS.map(e => ({ name: e, desc: e === DEFAULT_EFFORT ? `${e} (default)` : e })),
+    handler: (text, state) => {
       if (!state.convId) {
         state.messages.push({ role: "system", text: "No active conversation.", metadata: null });
         clearPrompt(state);
@@ -175,10 +176,17 @@ const commands: SlashCommand[] = [
       }
       const conv = state.sidebar.conversations.find(c => c.id === state.convId);
       const current = conv?.effort ?? DEFAULT_EFFORT;
-      const next: EffortLevel = current === "max" ? "high" : "max";
-      state.messages.push({ role: "system", text: `Effort set to ${next}`, metadata: null });
+      const parts = text.split(/\s+/);
+      const arg = parts[1] as EffortLevel | undefined;
+      if (arg && EFFORT_LEVELS.includes(arg)) {
+        state.messages.push({ role: "system", text: `Effort set to ${arg}`, metadata: null });
+        clearPrompt(state);
+        return { type: "effort_changed", effort: arg };
+      } else {
+        state.messages.push({ role: "system", text: `Current: ${current}. Available: ${EFFORT_LEVELS.join(", ")}`, metadata: null });
+      }
       clearPrompt(state);
-      return { type: "effort_changed", effort: next };
+      return { type: "handled" };
     },
   },
   {
