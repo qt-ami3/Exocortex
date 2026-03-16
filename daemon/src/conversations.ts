@@ -337,7 +337,7 @@ export type { ConversationDisplayData, DisplayEntry } from "./display";
 export function getDisplayData(id: string): ConversationDisplayData | null {
   const conv = conversations.get(id);
   if (!conv) return null;
-  return buildDisplayData(conv.id, conv.model, conv.messages, conv.lastContextTokens, summarizeTool);
+  return buildDisplayData(conv.id, conv.model, conv.effort, conv.messages, conv.lastContextTokens, summarizeTool);
 }
 
 // ── Unread state (runtime only, not persisted) ──────────────────────

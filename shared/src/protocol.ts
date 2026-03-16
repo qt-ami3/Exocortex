@@ -323,6 +323,7 @@ export interface ConversationLoadedEvent {
   reqId?: string;
   convId: string;
   model: ModelId;
+  effort: EffortLevel;
   /** All messages in display order. */
   entries: DisplayEntry[];
   /** Last known input token count for this conversation. */

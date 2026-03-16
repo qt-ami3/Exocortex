@@ -169,12 +169,13 @@ const commands: SlashCommand[] = [
     args: EFFORT_LEVELS.map(e => ({ name: e, desc: e === DEFAULT_EFFORT ? `${e} (default)` : e })),
     handler: (text, state) => {
       const parts = text.split(/\s+/);
-      const arg = parts[1] as EffortLevel | undefined;
-      if (arg && EFFORT_LEVELS.includes(arg)) {
-        state.effort = arg;
-        state.messages.push({ role: "system", text: `Effort set to ${arg}`, metadata: null });
+      const arg = parts[1];
+      if (arg && EFFORT_LEVELS.includes(arg as EffortLevel)) {
+        const effort = arg as EffortLevel;
+        state.effort = effort;
+        state.messages.push({ role: "system", text: `Effort set to ${effort}`, metadata: null });
         clearPrompt(state);
-        return { type: "effort_changed", effort: arg };
+        return { type: "effort_changed", effort };
       } else {
         state.messages.push({ role: "system", text: `Current: ${state.effort}. Available: ${EFFORT_LEVELS.join(", ")}`, metadata: null });
       }

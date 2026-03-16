@@ -238,6 +238,7 @@ export function createHandler(server: DaemonServer) {
             reqId: cmd.reqId,
             convId: data.convId,
             model: data.model,
+            effort: data.effort,
             entries: data.entries,
             contextTokens: data.contextTokens,
           });
@@ -258,6 +259,7 @@ export function createHandler(server: DaemonServer) {
           reqId: cmd.reqId,
           convId: data.convId,
           model: data.model,
+          effort: data.effort,
           entries: data.entries,
           contextTokens: data.contextTokens,
           queuedMessages: queued.length > 0 ? queued : undefined,
