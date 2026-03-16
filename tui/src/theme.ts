@@ -46,6 +46,7 @@ export interface Theme {
   historyLineBg: string;  // Selected line background in history
   selectionBg: string;    // Visual mode selection highlight
   appBg?: string;         // App-wide background (empty = terminal default)
+  cursorColor?: string;   // Terminal cursor color as hex (e.g. "#48cae4")
 
   // Border colors
   borderFocused: string;  // Focused panel border
