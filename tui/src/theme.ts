@@ -4,9 +4,16 @@
  * Defines the Theme interface and exports the active theme.
  * Every file that needs colors imports from here — no hardcoded
  * ANSI codes anywhere else in the TUI.
+ *
+ * The active `theme` object is mutated in-place so that every module
+ * that imported it sees changes immediately — no re-imports needed.
  */
 
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 import { whale } from "./themes/whale";
+import { cerberus } from "./themes/cerberus";
 
 // ── Theme interface ─────────────────────────────────────────────────
 
@@ -57,9 +64,69 @@ export interface Theme {
   italicOff: string;      // End italic
 }
 
+// ── Available themes ────────────────────────────────────────────────
+
+export const themes: Record<string, Theme> = {
+  whale,
+  cerberus,
+};
+
+export const THEME_NAMES = Object.keys(themes) as ThemeName[];
+export type ThemeName = keyof typeof themes;
+
+// ── Config persistence ─────────────────────────────────────────────
+
+function configDir(): string {
+  const xdg = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+  return join(xdg, "exocortex");
+}
+
+function themeConfigPath(): string {
+  return join(configDir(), "theme.json");
+}
+
+/** Read the persisted theme name from ~/.config/exocortex/theme.json. */
+function loadPersistedThemeName(): string | null {
+  try {
+    const data = JSON.parse(readFileSync(themeConfigPath(), "utf8"));
+    if (data && typeof data.theme === "string" && data.theme in themes) {
+      return data.theme;
+    }
+  } catch { /* missing or malformed — fall back to default */ }
+  return null;
+}
+
+/** Write the theme name to ~/.config/exocortex/theme.json. */
+function persistThemeName(name: string): void {
+  const dir = configDir();
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(themeConfigPath(), JSON.stringify({ theme: name }, null, 2) + "\n");
+}
+
 // ── Active theme ────────────────────────────────────────────────────
 
-export const theme: Theme = whale;
+// Start with whale, then immediately overwrite from persisted config.
+// We use Object.assign so the exported `theme` reference stays the same
+// object — every module that imported it sees mutations in-place.
+export const theme: Theme = { ...whale };
+
+const persisted = loadPersistedThemeName();
+if (persisted) {
+  Object.assign(theme, themes[persisted]);
+}
+
+/**
+ * Switch the active theme at runtime.
+ * Mutates the shared `theme` object in-place and persists the choice.
+ * Returns true if the theme was found and applied, false otherwise.
+ */
+export function setTheme(name: string): boolean {
+  const t = themes[name];
+  if (!t) return false;
+  Object.assign(theme, t);
+  persistThemeName(name);
+  return true;
+}
 
 // ── Utilities ──────────────────────────────────────────────────────
 

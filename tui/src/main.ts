@@ -107,6 +107,12 @@ function handleSubmit(): void {
         case "generate_title":
           if (state.convId) generateTitle(state.convId, state, daemon, scheduleRender);
           break;
+        case "theme_changed":
+          // Re-emit the cursor color escape for the new theme
+          if (theme.cursorColor) {
+            process.stdout.write(set_cursor_color(theme.cursorColor));
+          }
+          break;
         case "login":
           daemon.login();
           break;

@@ -16,6 +16,7 @@ import { convDisplayName } from "./messages";
 import { copyToClipboard } from "./vim/clipboard";
 import { PENDING_TITLE } from "./titlegen";
 import { getMarkPrefix, getMarkFromTitle } from "./marks";
+import { theme, themes, THEME_NAMES, setTheme } from "./theme";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -33,7 +34,8 @@ export type CommandResult =
   | { type: "rename_conversation"; title: string }
   | { type: "generate_title" }
   | { type: "login" }
-  | { type: "logout" };
+  | { type: "logout" }
+  | { type: "theme_changed" };
 
 export interface SlashCommand {
   name: string;
@@ -202,6 +204,30 @@ const commands: SlashCommand[] = [
 
       copyToClipboard(info);
       state.messages.push({ role: "system", text: "Conversation info copied to clipboard.", metadata: null });
+      clearPrompt(state);
+      return { type: "handled" };
+    },
+  },
+  {
+    name: "/theme",
+    description: "Set or show the current theme",
+    args: THEME_NAMES.map(n => ({ name: n, desc: n === theme.name ? `${n} (active)` : n })),
+    handler: (text, state) => {
+      const parts = text.split(/\s+/);
+      const arg = parts[1];
+      if (arg && arg in themes) {
+        if (arg === theme.name) {
+          state.messages.push({ role: "system", text: `Theme is already ${arg}`, metadata: null });
+          clearPrompt(state);
+          return { type: "handled" };
+        }
+        setTheme(arg);
+        state.messages.push({ role: "system", text: `Theme set to ${arg}`, metadata: null });
+        clearPrompt(state);
+        return { type: "theme_changed" };
+      } else {
+        state.messages.push({ role: "system", text: `Current: ${theme.name}. Available: ${THEME_NAMES.join(", ")}`, metadata: null });
+      }
       clearPrompt(state);
       return { type: "handled" };
     },
