@@ -20,6 +20,7 @@ import { DaemonServer } from "./server";
 import { createHandler } from "./handler";
 import { handleLogin } from "./cli";
 import * as convStore from "./conversations";
+import { startScheduler, stopScheduler, getCronDir, getJobs } from "./scheduler";
 import { socketPath, pidPath, runtimeDir, worktreeName } from "@exocortex/shared/paths";
 
 // ── Paths ───────────────────────────────────────────────────────────
@@ -80,6 +81,7 @@ async function startDaemon(): Promise<void> {
   // Graceful shutdown
   const shutdown = async () => {
     log("info", "exocortexd: shutting down");
+    stopScheduler();
     convStore.flushAll();
     await server.stop();
     try { unlinkSync(PID_PATH); } catch { /* best-effort cleanup */ }
@@ -93,17 +95,22 @@ async function startDaemon(): Promise<void> {
   // Load persisted conversations
   convStore.loadFromDisk();
 
+  // Start cron scheduler
+  startScheduler();
+
   // Check auth status
   const auth = loadAuth();
   const authOk = auth?.tokens?.accessToken && !isTokenExpired(auth.tokens);
 
   const wt = worktreeName();
+  const cronJobs = getJobs();
   console.log(`\n  exocortexd running (pid ${process.pid})${wt ? ` [worktree: ${wt}]` : ""}`);
   console.log(`  socket: ${SOCKET_PATH}`);
   console.log(`  auth:   ${authOk ? `✓ ${auth?.profile?.email ?? "authenticated"}` : "✗ not authenticated — run: bun run login"}`);
+  console.log(`  cron:   ${cronJobs.length} job(s) in ${getCronDir()}`);
   console.log(`\n  Waiting for connections...\n`);
 
-  log("info", `exocortexd: ready on ${SOCKET_PATH} (auth=${!!authOk})`);
+  log("info", `exocortexd: ready on ${SOCKET_PATH} (auth=${!!authOk}, cron=${cronJobs.length})`);
 }
 
 // ── Main ────────────────────────────────────────────────────────────
