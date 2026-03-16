@@ -12,7 +12,7 @@ export * from "@exocortex/shared/messages";
 
 // ── API-level types (for stored conversations / API replay) ─────────
 
-import type { ModelId, MessageMetadata } from "@exocortex/shared/messages";
+import { DEFAULT_EFFORT, type ModelId, type EffortLevel, type MessageMetadata } from "@exocortex/shared/messages";
 
 export type ApiContentBlock =
   | { type: "text"; text: string; cache_control?: { type: "ephemeral" } }
@@ -38,6 +38,7 @@ export interface StoredMessage {
 export interface Conversation {
   id: string;
   model: ModelId;
+  effort: EffortLevel;
   messages: StoredMessage[];
   createdAt: number;
   updatedAt: number;
@@ -70,11 +71,12 @@ export function isToolResultMessage(msg: StoredMessage): boolean {
   return msg.content.length > 0 && msg.content.some(b => b.type === "tool_result");
 }
 
-export function createConversation(id: string, model: ModelId, sortOrder?: number, title?: string): Conversation {
+export function createConversation(id: string, model: ModelId, sortOrder?: number, title?: string, effort?: EffortLevel): Conversation {
   const now = Date.now();
   return {
     id,
     model,
+    effort: effort ?? DEFAULT_EFFORT,
     messages: [],
     createdAt: now,
     updatedAt: now,

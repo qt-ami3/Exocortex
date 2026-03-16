@@ -11,7 +11,7 @@
 
 import { streamMessage, type ApiToolCall } from "./api";
 import { log } from "./log";
-import type { ModelId, Block, ToolCallBlock, ToolResultBlock, ApiMessage, ApiContentBlock } from "./messages";
+import type { ModelId, EffortLevel, Block, ToolCallBlock, ToolResultBlock, ApiMessage, ApiContentBlock } from "./messages";
 import { MAX_OUTPUT_CHARS, cap } from "./tools/util";
 import { MAX_CONTEXT, CONTEXT_TARGET } from "./constants";
 
@@ -122,6 +122,7 @@ export async function runAgentLoop(
     summarizer?: ToolSummarizer;
     maxTokens?: number;
     tools?: unknown[];
+    effort?: EffortLevel;
     /** Mutable state for abort recovery — caller reads on catch. */
     state?: AgentState;
   } = {},
@@ -166,6 +167,7 @@ export async function runAgentLoop(
       signal: options.signal,
       maxTokens: options.maxTokens,
       tools: options.tools,
+      effort: options.effort,
     });
 
     if (result.outputTokens) {

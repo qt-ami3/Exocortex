@@ -30,9 +30,10 @@ export function renderTopbar(state: RenderState, width?: number): string {
   const label = convLabel(state);
   const separator = label ? " — " : "";
 
+  const rightLabel = `${modelLabel} — ${state.effort}`;
   const inner = `${title}${separator}${label}`;
   const visibleUsed = " Exocortex".length + separator.length + label.length;
-  const padding = Math.max(0, w - visibleUsed - modelLabel.length - 1);
+  const padding = Math.max(0, w - visibleUsed - rightLabel.length - 1);
 
-  return `${theme.topbarBg}${inner}${" ".repeat(padding)}${modelLabel} ${theme.reset}`;
+  return `${theme.topbarBg}${inner}${" ".repeat(padding)}${rightLabel} ${theme.reset}`;
 }

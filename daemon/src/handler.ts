@@ -12,6 +12,7 @@ import { refreshUsage, handleUsageHeaders, getLastUsage } from "./usage";
 import { orchestrateSendMessage } from "./orchestrator";
 import { complete } from "./llm";
 import { getToolDisplayInfo } from "./tools/registry";
+import { EFFORT_LEVELS } from "./messages";
 import * as convStore from "./conversations";
 import { DaemonServer, type ConnectedClient } from "./server";
 import type { Command } from "./protocol";
@@ -43,7 +44,7 @@ export function createHandler(server: DaemonServer) {
       case "new_conversation": {
         const id = convStore.generateId();
         const model = cmd.model ?? "opus";
-        convStore.create(id, model, cmd.title);
+        convStore.create(id, model, cmd.title, cmd.effort);
         log("info", `handler: created conversation ${id} (model=${model}, title="${cmd.title ?? ""}")`);
 
         server.sendTo(client, {
@@ -99,6 +100,22 @@ export function createHandler(server: DaemonServer) {
           server.sendTo(client, { type: "ack", reqId: cmd.reqId, convId: cmd.convId });
           server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(cmd.convId)! });
           log("info", `handler: model set to ${cmd.model} for ${cmd.convId}`);
+        } else {
+          server.sendTo(client, { type: "error", reqId: cmd.reqId, convId: cmd.convId, message: `Conversation ${cmd.convId} not found` });
+        }
+        break;
+      }
+
+      case "set_effort": {
+        if (!EFFORT_LEVELS.includes(cmd.effort)) {
+          server.sendTo(client, { type: "error", reqId: cmd.reqId, convId: cmd.convId, message: `Invalid effort level: ${cmd.effort}. Valid: ${EFFORT_LEVELS.join(", ")}` });
+          break;
+        }
+        const ok = convStore.setEffort(cmd.convId, cmd.effort);
+        if (ok) {
+          server.sendTo(client, { type: "ack", reqId: cmd.reqId, convId: cmd.convId });
+          server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(cmd.convId)! });
+          log("info", `handler: effort set to ${cmd.effort} for ${cmd.convId}`);
         } else {
           server.sendTo(client, { type: "error", reqId: cmd.reqId, convId: cmd.convId, message: `Conversation ${cmd.convId} not found` });
         }
@@ -221,6 +238,7 @@ export function createHandler(server: DaemonServer) {
             reqId: cmd.reqId,
             convId: data.convId,
             model: data.model,
+            effort: data.effort,
             entries: data.entries,
             contextTokens: data.contextTokens,
           });
@@ -241,6 +259,7 @@ export function createHandler(server: DaemonServer) {
           reqId: cmd.reqId,
           convId: data.convId,
           model: data.model,
+          effort: data.effort,
           entries: data.entries,
           contextTokens: data.contextTokens,
           queuedMessages: queued.length > 0 ? queued : undefined,

@@ -11,7 +11,7 @@
 import type { RenderState } from "./state";
 import { clearPendingAI } from "./state";
 import { clearPrompt } from "./promptline";
-import type { ModelId } from "./messages";
+import { DEFAULT_EFFORT, EFFORT_LEVELS, type ModelId, type EffortLevel } from "./messages";
 import { convDisplayName } from "./messages";
 import { copyToClipboard } from "./vim/clipboard";
 import { PENDING_TITLE } from "./titlegen";
@@ -29,6 +29,7 @@ export type CommandResult =
   | { type: "quit" }
   | { type: "new_conversation" }
   | { type: "model_changed"; model: ModelId }
+  | { type: "effort_changed"; effort: EffortLevel }
   | { type: "rename_conversation"; title: string }
   | { type: "generate_title" }
   | { type: "login" }
@@ -66,6 +67,7 @@ function formatConvoInfo(state: RenderState): string | null {
     `Title:    ${title}`,
     `ID:       ${state.convId}`,
     `Model:    ${model}`,
+    `Effort:   ${state.effort}`,
     `Messages: ${msgs}`,
     `Created:  ${created}`,
     `Updated:  ${updated}`,
@@ -156,6 +158,26 @@ const commands: SlashCommand[] = [
         return { type: "model_changed", model: arg as ModelId };
       } else {
         state.messages.push({ role: "system", text: `Current: ${state.model}. Available: ${MODELS.join(", ")}`, metadata: null });
+      }
+      clearPrompt(state);
+      return { type: "handled" };
+    },
+  },
+  {
+    name: "/effort",
+    description: "Set or show reasoning effort level",
+    args: EFFORT_LEVELS.map(e => ({ name: e, desc: e === DEFAULT_EFFORT ? `${e} (default)` : e })),
+    handler: (text, state) => {
+      const parts = text.split(/\s+/);
+      const arg = parts[1];
+      if (arg && EFFORT_LEVELS.includes(arg as EffortLevel)) {
+        const effort = arg as EffortLevel;
+        state.effort = effort;
+        state.messages.push({ role: "system", text: `Effort set to ${effort}`, metadata: null });
+        clearPrompt(state);
+        return { type: "effort_changed", effort };
+      } else {
+        state.messages.push({ role: "system", text: `Current: ${state.effort}. Available: ${EFFORT_LEVELS.join(", ")}`, metadata: null });
       }
       clearPrompt(state);
       return { type: "handled" };

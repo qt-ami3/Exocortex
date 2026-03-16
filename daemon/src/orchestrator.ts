@@ -266,6 +266,7 @@ export async function orchestrateSendMessage(
         const s = summarizeTool(name, input);
         return s.detail || s.label;
       },
+      effort: conv.effort,
       state: agentState,
     });
 

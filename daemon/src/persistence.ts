@@ -13,12 +13,12 @@ import { join } from "path";
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, renameSync } from "fs";
 import { log } from "./log";
 import { conversationsDir, trashDir } from "@exocortex/shared/paths";
-import type { Conversation, StoredMessage, ApiMessage, ModelId, ConversationSummary } from "./messages";
-import { sortConversations } from "./messages";
+import type { Conversation, StoredMessage, ApiMessage, ModelId, EffortLevel, ConversationSummary } from "./messages";
+import { DEFAULT_EFFORT, sortConversations } from "./messages";
 
 // ── Schema version ──────────────────────────────────────────────────
 
-const CURRENT_VERSION = 8;
+const CURRENT_VERSION = 9;
 
 interface ConversationFileV1 {
   version: 1;
@@ -113,7 +113,22 @@ interface ConversationFileV8 {
   title: string;
 }
 
-type ConversationFile = ConversationFileV8;
+interface ConversationFileV9 {
+  version: 9;
+  id: string;
+  model: ModelId;
+  effort: EffortLevel;
+  messages: StoredMessage[];
+  createdAt: number;
+  updatedAt: number;
+  lastContextTokens: number | null;
+  marked: boolean;
+  pinned: boolean;
+  sortOrder: number;
+  title: string;
+}
+
+type ConversationFile = ConversationFileV9;
 
 // ── Migrations ──────────────────────────────────────────────────────
 
@@ -198,6 +213,15 @@ function migrateV7toV8(data: ConversationFileV7): ConversationFileV8 {
   };
 }
 
+/** v8 → v9: Add effort field. */
+function migrateV8toV9(data: ConversationFileV8): ConversationFileV9 {
+  return {
+    ...data,
+    version: 9,
+    effort: DEFAULT_EFFORT,
+  };
+}
+
 function migrate(raw: Record<string, unknown>): ConversationFile {
   // Progressive migration — each function validates and upgrades one version.
   // `any` is intentional at this deserialization boundary: the data is parsed
@@ -211,6 +235,7 @@ function migrate(raw: Record<string, unknown>): ConversationFile {
   if (data.version < 6) data = migrateV5toV6(data);
   if (data.version < 7) data = migrateV6toV7(data);
   if (data.version < 8) data = migrateV7toV8(data);
+  if (data.version < 9) data = migrateV8toV9(data);
 
   if (data.version !== CURRENT_VERSION) {
     log("warn", `persistence: unknown schema version ${data.version}, attempting to load as v${CURRENT_VERSION}`);
@@ -267,6 +292,7 @@ function toFile(conv: Conversation): ConversationFile {
     version: CURRENT_VERSION,
     id: conv.id,
     model: conv.model,
+    effort: conv.effort ?? DEFAULT_EFFORT,
     messages: conv.messages,
     createdAt: conv.createdAt,
     updatedAt: conv.updatedAt,
@@ -282,6 +308,7 @@ function fromFile(file: ConversationFile): Conversation {
   return {
     id: file.id,
     model: file.model,
+    effort: file.effort,
     messages: file.messages,
     createdAt: file.createdAt,
     updatedAt: file.updatedAt,
@@ -381,6 +408,7 @@ export function loadAll(): ConversationSummary[] {
       summaries.push({
         id: file.id,
         model: file.model,
+        effort: file.effort,
         createdAt: file.createdAt,
         updatedAt: file.updatedAt,
         messageCount: file.messages.length,

@@ -13,6 +13,13 @@
 
 export type ModelId = "sonnet" | "haiku" | "opus";
 
+// ── Effort ─────────────────────────────────────────────────────────
+
+export type EffortLevel = "low" | "medium" | "high" | "max";
+
+export const EFFORT_LEVELS: readonly EffortLevel[] = ["low", "medium", "high", "max"];
+export const DEFAULT_EFFORT: EffortLevel = "high";
+
 /** Maximum context window size in tokens, per model. */
 export const MAX_CONTEXT: Record<ModelId, number> = {
   sonnet: 1_000_000,
@@ -110,6 +117,7 @@ export type Message = UserMessage | AIMessage | SystemMessage;
 export interface ConversationSummary {
   id: string;
   model: ModelId;
+  effort: EffortLevel;
   createdAt: number;
   updatedAt: number;
   messageCount: number;

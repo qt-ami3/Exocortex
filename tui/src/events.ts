@@ -238,6 +238,10 @@ export function handleEvent(
 
     case "conversation_updated": {
       updateConversation(state.sidebar, event.summary);
+      // Sync effort if this is the active conversation (may have changed from another client)
+      if (event.summary.id === state.convId) {
+        state.effort = event.summary.effort;
+      }
       break;
     }
 
@@ -291,6 +295,7 @@ export function handleEvent(
       clearPendingAI(state);
       state.convId = event.convId;
       state.model = event.model;
+      state.effort = event.effort;
       state.scrollOffset = 0;
       state.contextTokens = event.contextTokens;
 

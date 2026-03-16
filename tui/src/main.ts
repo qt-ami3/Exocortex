@@ -98,6 +98,9 @@ function handleSubmit(): void {
         case "model_changed":
           if (state.convId) daemon.setModel(state.convId, cmdResult.model);
           break;
+        case "effort_changed":
+          if (state.convId) daemon.setEffort(state.convId, cmdResult.effort);
+          break;
         case "rename_conversation":
           if (state.convId) daemon.renameConversation(state.convId, cmdResult.title);
           break;
@@ -153,7 +156,7 @@ function sendDirectly(messageText: string, images?: ImageAttachment[]): void {
     state.pendingSend.active = true;
     state.pendingSend.text = messageText;
     state.pendingSend.images = images;
-    daemon.createConversation(state.model, PENDING_TITLE);
+    daemon.createConversation(state.model, PENDING_TITLE, state.effort);
   } else {
     daemon.sendMessage(state.convId, messageText, startedAt, images);
   }

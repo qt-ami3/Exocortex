@@ -8,8 +8,8 @@
  * Commands flow client → daemon. Events flow daemon → client.
  */
 
-import type { ModelId, Block, MessageMetadata, UsageData, ConversationSummary, ToolDisplayInfo, ImageAttachment } from "./messages";
-export type { ModelId, Block, MessageMetadata, UsageData, ConversationSummary, ToolDisplayInfo, ImageAttachment };
+import type { ModelId, EffortLevel, Block, MessageMetadata, UsageData, ConversationSummary, ToolDisplayInfo, ImageAttachment } from "./messages";
+export type { ModelId, EffortLevel, Block, MessageMetadata, UsageData, ConversationSummary, ToolDisplayInfo, ImageAttachment };
 
 // ── Commands (client → daemon) ──────────────────────────────────────
 
@@ -22,6 +22,7 @@ export interface NewConversationCommand {
   type: "new_conversation";
   reqId?: string;
   model?: ModelId;
+  effort?: EffortLevel;
   /** Initial title. Clients that don't set this get an empty title. */
   title?: string;
 }
@@ -71,6 +72,13 @@ export interface SetModelCommand {
   reqId?: string;
   convId: string;
   model: ModelId;
+}
+
+export interface SetEffortCommand {
+  type: "set_effort";
+  reqId?: string;
+  convId: string;
+  effort: EffortLevel;
 }
 
 export interface DeleteConversationCommand {
@@ -169,6 +177,7 @@ export type Command =
   | NewConversationCommand
   | SendMessageCommand
   | SetModelCommand
+  | SetEffortCommand
   | AbortCommand
   | SubscribeCommand
   | UnsubscribeCommand
@@ -314,6 +323,7 @@ export interface ConversationLoadedEvent {
   reqId?: string;
   convId: string;
   model: ModelId;
+  effort: EffortLevel;
   /** All messages in display order. */
   entries: DisplayEntry[];
   /** Last known input token count for this conversation. */

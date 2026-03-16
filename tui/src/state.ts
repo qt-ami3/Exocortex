@@ -5,7 +5,8 @@
  * Message and block types live in messages.ts.
  */
 
-import type { ModelId, UsageData, ToolDisplayInfo, ImageAttachment } from "./messages";
+import type { ModelId, EffortLevel, UsageData, ToolDisplayInfo, ImageAttachment } from "./messages";
+import { DEFAULT_EFFORT } from "./messages";
 import type { Message, AIMessage, SystemMessage } from "./messages";
 import type { MessageBound } from "./conversation";
 import type { PanelFocus } from "./focus";
@@ -63,6 +64,7 @@ export interface RenderState {
   /** The AI message currently being streamed (not yet finalized). */
   pendingAI: AIMessage | null;
   model: ModelId;
+  effort: EffortLevel;
   convId: string | null;
   inputBuffer: string;
   cursorPos: number;
@@ -136,6 +138,7 @@ export function createInitialState(): RenderState {
     messages: [],
     pendingAI: null,
     model: "opus",
+    effort: DEFAULT_EFFORT,
     convId: null,
     inputBuffer: "",
     cursorPos: 0,
