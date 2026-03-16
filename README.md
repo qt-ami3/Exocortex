@@ -22,6 +22,42 @@ A daemon-driven AI assistant with a clean client/server architecture.
                                               └──────────┘
 ```
 
+## Install
+
+Requires [Bun](https://bun.sh) and systemd (Arch Linux).
+
+```bash
+git clone https://github.com/Yeyito777/Exocortex.git
+cd Exocortex
+make install
+```
+
+This will:
+- Install dependencies (`bun install`)
+- Symlink `exocortexd`, `exocortex`, and `exo` into `~/.local/bin/`
+- Install and start a systemd user service for the daemon
+
+Then authenticate (one-time):
+
+```bash
+exocortexd login
+```
+
+Launch the TUI:
+
+```bash
+exocortex
+```
+
+> **Note:** Make sure `~/.local/bin` is in your `PATH`.
+> Add `export PATH="$HOME/.local/bin:$PATH"` to your shell rc if needed.
+
+To uninstall:
+
+```bash
+make uninstall
+```
+
 ## Architecture
 
 **Four packages** in a Bun workspace:
@@ -44,23 +80,6 @@ A daemon-driven AI assistant with a clean client/server architecture.
 
 The protocol between them is newline-delimited JSON over a Unix domain socket.
 Commands flow client → daemon. Events flow daemon → client.
-
-## Quick Start
-
-```bash
-# 1. Install dependencies
-cd daemon && bun install
-cd ../tui && bun install
-
-# 2. Authenticate (if not already logged in via Exocortex)
-cd ../daemon && bun run login
-
-# 3. Start the daemon
-bun run start
-
-# 4. In another terminal, start the TUI
-cd ../tui && bun run start
-```
 
 ## Usage
 
@@ -106,6 +125,11 @@ See `shared/src/protocol.ts` — the single source of truth for the IPC contract
 ## File Structure
 
 ```
+bin/
+├── exocortexd         Daemon launcher
+├── exocortex          TUI launcher
+└── exo                CLI launcher
+
 shared/
 └── src/
     ├── protocol.ts        IPC command/event type definitions

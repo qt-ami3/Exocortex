@@ -5,9 +5,6 @@
   "scripts": {
     "start": "bun run src/main.ts"
   },
-  "bin": {
-    "exo": "src/main.ts"
-  },
   "dependencies": {
     "@exocortex/shared": "workspace:*"
   },

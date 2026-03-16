@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# exocortexd — Exocortex daemon.
+# Thin wrapper that resolves the project root and runs the daemon entry point.
+# Service subcommands (restart, stop, status) go straight to systemctl.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+SERVICE="exocortex-daemon.service"
+
+case "${1:-}" in
+  restart)
+    systemctl --user restart "$SERVICE"
+    echo "  ✓ Restarted"
+    systemctl --user status "$SERVICE" --no-pager
+    ;;
+  stop)
+    systemctl --user stop "$SERVICE"
+    echo "  ✓ Stopped"
+    ;;
+  status)
+    systemctl --user status "$SERVICE" --no-pager
+    ;;
+  *)
+    cd "$PROJECT_DIR/daemon"
+    exec bun run src/main.ts "$@"
+    ;;
+esac

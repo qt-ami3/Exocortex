@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# exocortex — Exocortex TUI client.
+# Thin wrapper that resolves the project root and runs the TUI entry point.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+cd "$PROJECT_DIR/tui"
+exec bun run src/main.ts "$@"
