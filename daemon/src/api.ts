@@ -23,7 +23,7 @@ const API_VERSION = "2023-06-01";
 // custom name (e.g. "exocortex/0.1.0") causes consistent load shedding
 // (overloaded_error). Update these when Claude Code releases a new version.
 // See reference/api-request-identity.md for the full story.
-const CLAUDE_CODE_VERSION = "2.1.76";
+const CLAUDE_CODE_VERSION = "2.1.77";
 const CLAUDE_CODE_USER_AGENT = `claude-code/${CLAUDE_CODE_VERSION}`;
 const BETA_FLAGS = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,prompt-caching-scope-2026-01-05,effort-2025-11-24";
 const BILLING_HEADER = `x-anthropic-billing-header: cc_version=${CLAUDE_CODE_VERSION}; cc_entrypoint=cli;`;
