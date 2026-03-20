@@ -3,5 +3,6 @@ node_modules
 dist/
 .worktrees/
 external-tools/*
+!external-tools/TOOL_STANDARD.md
 *.lock*
 *.log
