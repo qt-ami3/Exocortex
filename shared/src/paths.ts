@@ -1,7 +1,11 @@
 /**
  * @exocortex/shared — Path resolution with git worktree isolation.
  *
- * Directory layout under CONFIG_DIR (~/.config/exocortex):
+ * All paths are resolved relative to the repo root, detected from
+ * the source file's own location via import.meta.dir. This means
+ * everything works regardless of CWD or where the repo is moved to.
+ *
+ * Directory layout under <repo>/config/:
  *
  *   config root/        system.md, theme.json (tracked config)
  *   secrets/            env, credentials.json (never tracked)
@@ -16,15 +20,13 @@
  */
 
 import { execSync } from "child_process";
-import { homedir } from "os";
 import { join, basename, resolve } from "path";
 
-// ── Base config dir ─────────────────────────────────────────────────
+// ── Repo root ───────────────────────────────────────────────────────
+// This file lives at <repo>/shared/src/paths.ts — two levels up is the repo root.
 
-const CONFIG_DIR = join(
-  process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
-  "exocortex",
-);
+const REPO_ROOT = resolve(import.meta.dir, "../..");
+const CONFIG_DIR = join(REPO_ROOT, "config");
 
 // ── Worktree detection ──────────────────────────────────────────────
 
@@ -69,9 +71,19 @@ function detectWorktree(): string | null {
 
 // ── Public API ──────────────────────────────────────────────────────
 
-/** Base config directory (~/.config/exocortex). */
+/** Repository root, resolved from this source file's location. */
+export function repoRoot(): string {
+  return REPO_ROOT;
+}
+
+/** Base config directory (<repo>/config). */
 export function configDir(): string {
   return CONFIG_DIR;
+}
+
+/** External tools directory (<repo>/external-tools). */
+export function externalToolsDir(): string {
+  return join(REPO_ROOT, "external-tools");
 }
 
 /** Secrets directory — API keys, OAuth tokens. Shared across worktrees. */

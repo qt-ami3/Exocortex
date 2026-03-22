@@ -23,8 +23,9 @@
 
 import { readFileSync, readdirSync, statSync, watch, existsSync, mkdirSync, openSync, closeSync } from "fs";
 import { join, dirname, resolve } from "path";
-import { execSync, spawn, type ChildProcess } from "child_process";
+import { spawn, type ChildProcess } from "child_process";
 import { log } from "./log";
+import { externalToolsDir as getExternalToolsDir } from "@exocortex/shared/paths";
 import type { ExternalToolStyle } from "@exocortex/shared/messages";
 
 // ── Manifest schema ──────────────────────────────────────────────
@@ -223,19 +224,9 @@ function stopAllDaemons(): void {
   }
 }
 
-// ── Repo root resolution ─────────────────────────────────────────
-
-function resolveExternalToolsDir(): string | null {
-  try {
-    const root = execSync("git rev-parse --show-toplevel", {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
-    return join(root, "external-tools");
-  } catch {
-    return null;
-  }
-}
+// ── External tools directory ─────────────────────────────────────
+// Resolved from import.meta.dir via @exocortex/shared/paths — no
+// git dependency, survives mv of the repo.
 
 // ── Manifest loading ─────────────────────────────────────────────
 
@@ -364,11 +355,7 @@ function applyTools(tools: LoadedTool[]): boolean {
  * The onUpdate callback fires when tools are added or removed at runtime.
  */
 export function initExternalTools(onUpdate?: () => void): void {
-  _externalToolsDir = resolveExternalToolsDir();
-  if (!_externalToolsDir) {
-    log("warn", "external-tools: could not resolve repo root — external tools disabled");
-    return;
-  }
+  _externalToolsDir = getExternalToolsDir();
 
   // Ensure directory exists (gitignored, may not exist yet)
   mkdirSync(_externalToolsDir, { recursive: true });

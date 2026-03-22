@@ -1,33 +1,57 @@
 #!/usr/bin/env bash
-# Remove compatibility symlinks from the config dir reorganization
-# and restart the daemon so it picks up the new paths.
+# Migrate config from ~/.config/exocortex/ into the repo at config/.
+#
+# After this migration:
+#   - Config lives at <repo>/config/ (self-contained)
+#   - ~/.config/exocortex is a symlink to <repo>/config/ (XDG compat)
+#   - All path resolution uses import.meta.dir (survives mv)
+#
+# Safe to run multiple times — skips steps that are already done.
 set -euo pipefail
 
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/exocortex"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_CONFIG="$REPO_DIR/config"
+XDG_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/exocortex"
 
-echo "Cleaning up compatibility symlinks in $CONFIG_DIR ..."
+echo "Repo:       $REPO_DIR"
+echo "Config dir: $REPO_CONFIG"
+echo ""
 
-SYMLINKS=(env credentials.json conversations trash instances cron usage.json)
-
-for link in "${SYMLINKS[@]}"; do
-  target="$CONFIG_DIR/$link"
-  if [ -L "$target" ]; then
-    rm "$target"
-    echo "  ✓ removed $link"
-  elif [ -e "$target" ]; then
-    echo "  ⚠ $link exists but is not a symlink — skipping"
+# Step 1: Ensure config exists in the repo
+if [ ! -d "$REPO_CONFIG" ]; then
+  if [ -d "$XDG_CONFIG" ] && [ ! -L "$XDG_CONFIG" ]; then
+    echo "Moving $XDG_CONFIG → $REPO_CONFIG ..."
+    mv "$XDG_CONFIG" "$REPO_CONFIG"
   else
-    echo "  · $link already gone"
+    echo "✗ No config dir found at $XDG_CONFIG or $REPO_CONFIG"
+    exit 1
   fi
-done
+fi
+echo "✓ Config dir at $REPO_CONFIG"
 
-# The daemon recreated exocortex.log at the old root while running old code.
-# Clean it up — new code writes to runtime/exocortex.log.
-if [ -f "$CONFIG_DIR/exocortex.log" ] && [ ! -L "$CONFIG_DIR/exocortex.log" ]; then
-  rm "$CONFIG_DIR/exocortex.log"
-  echo "  ✓ removed stale exocortex.log from config root"
+# Step 2: Symlink from XDG location
+if [ -L "$XDG_CONFIG" ]; then
+  current_target="$(readlink "$XDG_CONFIG")"
+  if [ "$current_target" = "$REPO_CONFIG" ]; then
+    echo "✓ Symlink already exists: $XDG_CONFIG → $REPO_CONFIG"
+  else
+    echo "⚠ Symlink exists but points to $current_target — updating"
+    rm "$XDG_CONFIG"
+    ln -s "$REPO_CONFIG" "$XDG_CONFIG"
+    echo "✓ Symlink updated"
+  fi
+elif [ -d "$XDG_CONFIG" ]; then
+  echo "⚠ $XDG_CONFIG is still a real directory — replacing with symlink"
+  rm -rf "$XDG_CONFIG"
+  ln -s "$REPO_CONFIG" "$XDG_CONFIG"
+  echo "✓ Symlink created"
+else
+  ln -s "$REPO_CONFIG" "$XDG_CONFIG"
+  echo "✓ Symlink created: $XDG_CONFIG → $REPO_CONFIG"
 fi
 
+# Step 3: Restart daemon
 echo ""
 echo "Restarting daemon ..."
 systemctl --user restart exocortex-daemon
