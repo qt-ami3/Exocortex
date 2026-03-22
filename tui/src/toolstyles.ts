@@ -54,16 +54,18 @@ function matchExternalTool(summary: string, styles: ExternalToolStyle[]): Resolv
     if (m) return m;
   }
 
-  // Retry: skip leading comment and blank lines
+  // Retry: skip leading comment and blank lines, then match
+  // from the first real command line onward (preserving all
+  // subsequent lines so multi-line commands stay intact).
   const lines = trimmed.split("\n");
   const firstCmd = lines.findIndex(l => {
     const t = l.trimStart();
     return t !== "" && !t.startsWith("#");
   });
   if (firstCmd > 0) {
-    const cmdLine = lines[firstCmd].trimStart();
+    const remainder = lines.slice(firstCmd).join("\n").trimStart();
     for (const style of styles) {
-      const m = tryMatch(cmdLine, style);
+      const m = tryMatch(remainder, style);
       if (m) return m;
     }
   }

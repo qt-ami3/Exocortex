@@ -62,9 +62,6 @@ const MACROS: MacroDef[] = [
   { name: "/long", desc: "Work until complete", expansion: "This is a long running task, work tirelessly until you can verify that everything is complete and correct" },
   { name: "/diagnose", desc: "Pinpoint the cause", expansion: "Can you pinpoint the exact cause and tell me your diagnosis?" },
   { name: "/quality", desc: "Code quality assessment", expansion: "Give your changes a code quality assesment. Is there anything that should be split off into other files, de-duplicated, or made more clear?" },
-  { name: "/qutebrowser", desc: "Qutebrowser CLI context", expansion: "You have access to qutebrowser through the qb CLI tool (IN YOUR PATH, source at ~/Workspace/qutebrowser-cli/). Run qb -h for usage reference." },
-  { name: "/gmail", desc: "Gmail tool context", expansion: "You have access to my gmail through the gmail CLI tool (IN YOUR PATH, source at ~/Workspace/gmail-cli) Run gmail -h for usage reference." },
-  { name: "/twitter", desc: "Twitter tool context", expansion: "You have access to Twitter/X through the twitter CLI tool (IN YOUR PATH, source at /Workspace/twitter/). Run twitter -h for usage reference." },
   {
     name: "/worktree", desc: "Work in a git worktree",
     expansion: "Work in a git worktree for this task. Find the repo root first (the directory containing `.git/`; don't assume CWD is it). Create the worktree with `git worktree add .worktrees/<name> -b <name> HEAD` from there. When I say I'm satisfied, merge back to main and clean up: run `git worktree remove .worktrees/<name>`, delete the branch with `git branch -d <name>`, and remove the leftover config dirs `~/.config/exocortex/runtime/<name>/` and `~/.config/exocortex/data/instances/<name>/`.",
