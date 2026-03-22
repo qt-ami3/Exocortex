@@ -139,7 +139,7 @@ function renderBlock(block: Block, contentWidth: number, toolRegistry: ToolDispl
         // formatting, and word wrapping — output is fully formatted.
         const mdLines = markdownWordWrap(text, contentWidth, theme.reset);
         for (const line of mdLines) {
-          lines.push(line === "" ? "" : `  ${line}`);
+          lines.push(`  ${line}`);
           cont.push(false);
         }
       }
