@@ -11,7 +11,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { configDir } from "@exocortex/shared/paths";
 import { whale } from "./themes/whale";
 import { cerberus } from "./themes/cerberus";
 
@@ -75,11 +75,6 @@ export const THEME_NAMES = Object.keys(themes) as ThemeName[];
 export type ThemeName = keyof typeof themes;
 
 // ── Config persistence ─────────────────────────────────────────────
-
-function configDir(): string {
-  const xdg = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
-  return join(xdg, "exocortex");
-}
 
 function themeConfigPath(): string {
   return join(configDir(), "theme.json");

@@ -1,5 +1,5 @@
 /**
- * Load environment variables from ~/.config/exocortex/env into process.env.
+ * Load environment variables from ~/.config/exocortex/secrets/env into process.env.
  *
  * Supports:
  *   KEY=value
@@ -15,9 +15,9 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { log } from "./log";
-import { configDir } from "@exocortex/shared/paths";
+import { secretsDir } from "@exocortex/shared/paths";
 
-const ENV_PATH = join(configDir(), "env");
+const ENV_PATH = join(secretsDir(), "env");
 
 export function loadEnvFile(): void {
   let content: string;

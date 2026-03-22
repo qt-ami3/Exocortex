@@ -1,8 +1,8 @@
 /**
  * Conversation persistence — versioned JSON files.
  *
- * Reads/writes conversation files to ~/.config/exocortex/conversations/.
- * Trash (soft-delete) lives in a sibling trash/ directory with a
+ * Reads/writes conversation files to ~/.config/exocortex/data/conversations/.
+ * Trash (soft-delete) lives in a sibling data/trash/ directory with a
  * stack-ordered trash.json for undo support.
  * Schema is versioned — migrations run on load to upgrade old formats.
  *

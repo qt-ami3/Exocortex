@@ -3,7 +3,7 @@
  *
  * Builds the system prompt sent to the Anthropic API.
  * Base prompt + per-tool hints from the registry + optional
- * user addendum from ~/.config/exocortex/system.md.
+ * user addendum from the config root (system.md).
  */
 
 import { readFileSync } from "fs";

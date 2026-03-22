@@ -1,7 +1,7 @@
 /**
  * File logger for exocortexd.
  *
- * Writes to ~/.config/exocortex/exocortex.log with automatic rotation at 5 MB.
+ * Writes to ~/.config/exocortex/runtime/exocortex.log with automatic rotation at 5 MB.
  * Keeps up to 3 rotated files (.log.1, .log.2, .log.3) for ~20 MB total history.
  * Log entries are buffered and flushed asynchronously via microtask to avoid
  * blocking the event loop with synchronous I/O on every call. Rotation is
@@ -11,9 +11,9 @@
 
 import { appendFileSync, appendFile as appendFileCb, mkdirSync, existsSync, statSync, renameSync, unlinkSync } from "fs";
 import { join } from "path";
-import { configDir } from "@exocortex/shared/paths";
+import { runtimeDir } from "@exocortex/shared/paths";
 
-const LOG_DIR = configDir();
+const LOG_DIR = runtimeDir();
 const LOG_FILE = join(LOG_DIR, "exocortex.log");
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
 const MAX_LOG_FILES = 3;

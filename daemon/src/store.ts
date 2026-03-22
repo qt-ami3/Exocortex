@@ -1,13 +1,13 @@
 /**
  * Credential storage for exocortexd.
  *
- * Reads/writes OAuth tokens to ~/.config/exocortex/credentials.json.
+ * Reads/writes OAuth tokens to ~/.config/exocortex/secrets/credentials.json.
  */
 
 import { join } from "path";
 import { mkdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
 import { log } from "./log";
-import { configDir } from "@exocortex/shared/paths";
+import { secretsDir } from "@exocortex/shared/paths";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -39,12 +39,12 @@ export interface StoredAuth {
 
 // ── Paths ───────────────────────────────────────────────────────────
 
-const CONFIG_DIR = configDir();
-const CRED_FILE = join(CONFIG_DIR, "credentials.json");
+const SECRETS_DIR = secretsDir();
+const CRED_FILE = join(SECRETS_DIR, "credentials.json");
 
 function ensureDir(): void {
-  if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  if (!existsSync(SECRETS_DIR)) {
+    mkdirSync(SECRETS_DIR, { recursive: true, mode: 0o700 });
   }
 }
 

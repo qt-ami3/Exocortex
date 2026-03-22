@@ -1,12 +1,18 @@
 /**
  * @exocortex/shared — Path resolution with git worktree isolation.
  *
- * When running from a linked git worktree, runtime paths (socket, PID)
+ * Directory layout under CONFIG_DIR (~/.config/exocortex):
+ *
+ *   config root/        system.md, theme.json (tracked config)
+ *   secrets/            env, credentials.json (never tracked)
+ *   data/               conversations/, trash/ (bulk data, never tracked)
+ *   runtime/            PID, socket, logs, usage.json (ephemeral)
+ *   storage/            cron/, fix-auth.md (persistent user-local, not tracked)
+ *
+ * When running from a linked git worktree, runtime paths (socket, PID, logs)
  * and data paths (conversations) are namespaced by worktree name.
  * This lets multiple daemons coexist — one per worktree — without
- * conflicting. The main checkout uses default (un-namespaced) paths.
- *
- * Credentials are always shared (same user, same API key).
+ * conflicting. Secrets are always shared (same user, same API key).
  */
 
 import { execSync } from "child_process";
@@ -68,7 +74,25 @@ export function configDir(): string {
   return CONFIG_DIR;
 }
 
-/** Runtime dir for socket + PID. Namespaced by worktree if applicable. */
+/** Secrets directory — API keys, OAuth tokens. Shared across worktrees. */
+export function secretsDir(): string {
+  return join(CONFIG_DIR, "secrets");
+}
+
+/** Data directory — conversations, trash. Namespaced by worktree. */
+export function dataDir(): string {
+  const wt = detectWorktree();
+  return wt
+    ? join(CONFIG_DIR, "data", "instances", wt)
+    : join(CONFIG_DIR, "data");
+}
+
+/** Storage directory — cron scripts, docs. Persistent user-local files. */
+export function storageDir(): string {
+  return join(CONFIG_DIR, "storage");
+}
+
+/** Runtime dir for socket, PID, logs, usage. Namespaced by worktree. */
 export function runtimeDir(): string {
   const wt = detectWorktree();
   return wt
@@ -88,18 +112,12 @@ export function pidPath(): string {
 
 /** Conversations directory. Isolated per worktree to prevent data conflicts. */
 export function conversationsDir(): string {
-  const wt = detectWorktree();
-  return wt
-    ? join(CONFIG_DIR, "instances", wt, "conversations")
-    : join(CONFIG_DIR, "conversations");
+  return join(dataDir(), "conversations");
 }
 
 /** Trash directory for soft-deleted conversations. Isolated per worktree. */
 export function trashDir(): string {
-  const wt = detectWorktree();
-  return wt
-    ? join(CONFIG_DIR, "instances", wt, "trash")
-    : join(CONFIG_DIR, "trash");
+  return join(dataDir(), "trash");
 }
 
 /** The worktree name if in a linked worktree, null otherwise. */
