@@ -21,12 +21,16 @@
  */
 
 import { execSync } from "child_process";
-import { join, basename, resolve } from "path";
+import { join, basename, resolve, dirname } from "path";
 
 // ── Repo root ───────────────────────────────────────────────────────
-// This file lives at <repo>/shared/src/paths.ts — two levels up is the repo root.
+// On Linux (dev): this file lives at <repo>/shared/src/paths.ts — two levels up is the repo root.
+// On Windows (compiled exe): import.meta.dir is meaningless inside the bundle,
+// so we use the directory containing the executable as the root.
 
-const REPO_ROOT = resolve(import.meta.dir, "../..");
+const REPO_ROOT = process.platform === "win32"
+  ? dirname(process.execPath)
+  : resolve(import.meta.dir, "../..");
 const CONFIG_DIR = join(REPO_ROOT, "config");
 
 // ── Worktree detection ──────────────────────────────────────────────
