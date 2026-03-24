@@ -25,7 +25,6 @@ jobs:
           mkdir -p dist
           bun build --compile --target=bun-windows-x64 daemon/src/main.ts --outfile dist/exocortexd.exe
           bun build --compile --target=bun-windows-x64 tui/src/main.ts --outfile dist/exocortex.exe
-          bun build --compile --target=bun-windows-x64 external-tools/exo-cli/src/main.ts --outfile dist/exo.exe
           cp scripts/exocortex.bat dist/exocortex.bat
 
       - name: Zip release
