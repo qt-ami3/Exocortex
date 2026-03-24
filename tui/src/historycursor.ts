@@ -10,6 +10,7 @@
 import type { KeyEvent } from "./input";
 import type { Action } from "./keybinds";
 import type { RenderState } from "./state";
+import { getViewStart } from "./chat";
 import { copyToClipboard } from "./vim/clipboard";
 import { keyString, resetPending } from "./vim/types";
 import { resolveTextObject, isTextObjectKey } from "./vim/textobjects";
@@ -174,7 +175,7 @@ export function scrollLineWithStickyCursor(state: RenderState, dir: number): voi
   state.scrollOffset = Math.max(0, Math.min(state.scrollOffset + dir, maxOff));
 
   // Cursor stays on same buffer row — only adjust if off-screen
-  const viewStart = totalLines - messageAreaHeight - state.scrollOffset;
+  const viewStart = getViewStart(state);
   const viewEnd = viewStart + messageAreaHeight - 1;
   const curRow = state.historyCursor.row;
 
@@ -414,10 +415,9 @@ export function placeAtVisibleBottom(state: RenderState): HistoryCursor {
   if (lines.length === 0) return { row: 0, col: 0 };
 
   const { messageAreaHeight } = state.layout;
-  const totalLines = lines.length;
 
-  const viewStart = Math.max(0, totalLines - messageAreaHeight - state.scrollOffset);
-  const viewEnd = Math.min(totalLines - 1, viewStart + messageAreaHeight - 1);
+  const viewStart = getViewStart(state);
+  const viewEnd = Math.min(lines.length - 1, viewStart + messageAreaHeight - 1);
 
   return { row: viewEnd, col: clampCol(0, lines, viewEnd) };
 }
@@ -431,7 +431,7 @@ export function ensureCursorVisible(state: RenderState): void {
   }
 
   const cursorRow = state.historyCursor.row;
-  const viewStart = totalLines - messageAreaHeight - state.scrollOffset;
+  const viewStart = getViewStart(state);
   const viewEnd = viewStart + messageAreaHeight;
 
   if (cursorRow < viewStart) {

@@ -13,6 +13,7 @@
 
 import type { RenderState } from "./state";
 import type { ImageAttachment } from "./messages";
+import { getViewStart } from "./chat";
 import { renderStatusLine } from "./statusline";
 import { renderTopbar } from "./topbar";
 import { renderSidebar, SIDEBAR_WIDTH } from "./sidebar";
@@ -208,12 +209,7 @@ export function render(state: RenderState): void {
   state.layout.firstInputRow = firstInputRow;
   state.layout.sepBelow = sepBelow;
 
-  let viewStart: number;
-  if (state.scrollOffset === 0) {
-    viewStart = Math.max(0, totalLines - messageAreaHeight);
-  } else {
-    viewStart = Math.max(0, totalLines - messageAreaHeight - state.scrollOffset);
-  }
+  const viewStart = getViewStart(state);
 
   // Compute visual selection range if in visual mode
   const inVisual = historyFocused

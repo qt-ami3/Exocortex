@@ -10,7 +10,7 @@
 import type { MouseEvent } from "./input";
 import type { RenderState } from "./state";
 import type { KeyResult } from "./focus";
-import { scrollBy } from "./chat";
+import { scrollBy, getViewStart } from "./chat";
 import { sidebarHitTest, scrollSidebar, syncSelectedIndex, SIDEBAR_WIDTH } from "./sidebar";
 import { mouse_cursor_pointer, mouse_cursor_text, mouse_cursor_hand } from "./terminal";
 import { clampCol, ensureCursorVisible, getHistoryVisualSelection } from "./historycursor";
@@ -32,14 +32,11 @@ function screenToHistoryPos(
   const { layout } = state;
   const lines = state.historyLines;
   const totalLines = lines.length;
-  const { messageAreaHeight } = layout;
 
   // Must be inside the message area (rows 3 to sepAbove-1)
   if (screenRow < 3 || layout.sepAbove <= 0 || screenRow >= layout.sepAbove) return null;
 
-  const viewStart = state.scrollOffset === 0
-    ? Math.max(0, totalLines - messageAreaHeight)
-    : Math.max(0, totalLines - messageAreaHeight - state.scrollOffset);
+  const viewStart = getViewStart(state);
 
   const lineIdx = viewStart + (screenRow - 3);
   if (lineIdx < 0 || lineIdx >= totalLines) return null;
