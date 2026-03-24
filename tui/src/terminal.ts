@@ -16,6 +16,13 @@ export const enable_bracketed_paste = `${ESC}?2004h`;
 export const disable_bracketed_paste = `${ESC}?2004l`;
 export const enable_kitty_kbd = `${ESC}>1u`;   // push disambiguate mode (kitty keyboard protocol)
 export const disable_kitty_kbd = `${ESC}<u`;    // pop keyboard mode
+export const enable_mouse = `${ESC}?1003h${ESC}?1006h`;   // all motion + SGR extended encoding
+export const disable_mouse = `${ESC}?1003l${ESC}?1006l`;
+
+/** OSC 777 mouseshape: switch X cursor between text (I-beam), pointer (arrow), and hand (clickable). */
+export const mouse_cursor_text = `\x1b]777;mouseshape;text\x07`;
+export const mouse_cursor_pointer = `\x1b]777;mouseshape;pointer\x07`;
+export const mouse_cursor_hand = `\x1b]777;mouseshape;hand\x07`;
 export const cursor_block = `${ESC}2 q`;       // steady block (vim normal)
 export const cursor_underline = `${ESC}4 q`;   // steady underline (vim pending operator)
 export const cursor_bar = `${ESC}6 q`;         // steady bar (vim insert / default)

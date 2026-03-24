@@ -5,6 +5,7 @@
  * When vim is enabled, keys pass through the vim engine first.
  * Chat manages its own inner focus (prompt/history) via chat.ts.
  * Sidebar manages its own keys via sidebar.ts.
+ * Mouse events are handled separately in mouse.ts.
  *
  * This is the top-level key routing — the only file main.ts calls
  * for key handling.
@@ -531,3 +532,4 @@ function handleChatFocused(key: KeyEvent, state: RenderState): KeyResult {
       return { type: "handled" };
   }
 }
+

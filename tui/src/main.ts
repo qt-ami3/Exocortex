@@ -9,13 +9,14 @@
  */
 
 import { DaemonClient } from "./client";
-import { parseKeys, PasteBuffer, type KeyEvent } from "./input";
+import { parseInput, PasteBuffer, type KeyEvent, type MouseEvent, type InputEvent } from "./input";
 import { handleFocusedKey } from "./focus";
+import { handleMouseEvent } from "./mouse";
 import { clearPrompt } from "./promptline";
 import { tryCommand } from "./commands";
 import { expandMacros } from "./macros";
 import { render } from "./render";
-import { enter_alt, leave_alt, hide_cursor, show_cursor, enable_bracketed_paste, disable_bracketed_paste, enable_kitty_kbd, disable_kitty_kbd, set_cursor_color, reset_cursor_color } from "./terminal";
+import { enter_alt, leave_alt, hide_cursor, show_cursor, enable_bracketed_paste, disable_bracketed_paste, enable_kitty_kbd, disable_kitty_kbd, enable_mouse, disable_mouse, set_cursor_color, reset_cursor_color } from "./terminal";
 import { createInitialState, isStreaming, clearPendingAI } from "./state";
 import { createPendingAI, type ImageAttachment } from "./messages";
 import { handleEvent } from "./events";
@@ -268,11 +269,42 @@ function handleKey(key: KeyEvent): void {
   scheduleRender();
 }
 
+function handleMouse(ev: MouseEvent): void {
+  // Motion events: only render if something visual changed (focus switch, drag selection)
+  if (ev.action === "motion") {
+    const prevFocus = state.panelFocus;
+    const prevCursorRow = state.historyCursor.row;
+    const prevCursorCol = state.historyCursor.col;
+    handleMouseEvent(ev, state);
+    if (state.panelFocus !== prevFocus
+        || state.historyCursor.row !== prevCursorRow
+        || state.historyCursor.col !== prevCursorCol) {
+      scheduleRender();
+    }
+    return;
+  }
+
+  const result = handleMouseEvent(ev, state);
+
+  switch (result.type) {
+    case "load_conversation":
+      daemon.loadConversation(result.convId);
+      break;
+    case "handled":
+      break;
+    // Mouse events don't trigger most actions — ignore other result types
+    default:
+      break;
+  }
+
+  scheduleRender();
+}
+
 // ── Terminal setup ──────────────────────────────────────────────────
 
 function setupTerminal(): void {
   const cursorColorSeq = theme.cursorColor ? set_cursor_color(theme.cursorColor) : '';
-  process.stdout.write(enter_alt + hide_cursor + enable_bracketed_paste + enable_kitty_kbd + cursorColorSeq);
+  process.stdout.write(enter_alt + hide_cursor + enable_bracketed_paste + enable_kitty_kbd + enable_mouse + cursorColorSeq);
   if (process.stdin.isTTY) process.stdin.setRawMode(true);
   process.stdin.resume();
   terminalSetUp = true;
@@ -282,7 +314,7 @@ function restoreTerminal(): void {
   if (!terminalSetUp) return;
   if (process.stdin.isTTY) process.stdin.setRawMode(false);
   const cursorResetSeq = theme.cursorColor ? reset_cursor_color : '';
-  process.stdout.write(disable_kitty_kbd + disable_bracketed_paste + show_cursor + cursorResetSeq + leave_alt);
+  process.stdout.write(disable_mouse + disable_kitty_kbd + disable_bracketed_paste + show_cursor + cursorResetSeq + leave_alt);
   terminalSetUp = false;
 }
 
@@ -322,9 +354,13 @@ async function main(): Promise<void> {
   const pasteBuffer = new PasteBuffer(processInput);
 
   function processInput(str: string): void {
-    const keys = parseKeys(str);
-    for (const key of keys) {
-      handleKey(key);
+    const events = parseInput(str);
+    for (const ev of events) {
+      if (ev.type === "mouse") {
+        handleMouse(ev);
+      } else {
+        handleKey(ev);
+      }
       if (!running) break;
     }
     if (!running) cleanup();

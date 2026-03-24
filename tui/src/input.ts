@@ -1,7 +1,8 @@
 /**
- * Terminal key input parser.
+ * Terminal input parser.
  *
- * Converts raw stdin bytes into structured key events.
+ * Converts raw stdin bytes into structured input events
+ * (keyboard, mouse, and bracketed paste).
  */
 
 export interface KeyEvent {
@@ -22,6 +23,23 @@ export interface KeyEvent {
   /** For paste events: the full pasted text. */
   text?: string;
 }
+
+export interface MouseEvent {
+  type: "mouse";
+  /** 0=left, 1=middle, 2=right, 3=none (motion only), 64=scroll_up, 65=scroll_down */
+  button: number;
+  /** 1-based column */
+  col: number;
+  /** 1-based row */
+  row: number;
+  action: "press" | "release" | "motion";
+  shift: boolean;
+  meta: boolean;
+  ctrl: boolean;
+}
+
+/** Union of all input events from the terminal. */
+export type InputEvent = KeyEvent | MouseEvent;
 
 /**
  * CSI u (kitty keyboard protocol) lookup table.
@@ -130,8 +148,16 @@ export class PasteBuffer {
   }
 }
 
-export function parseKeys(data: Buffer | string): KeyEvent[] {
-  const events: KeyEvent[] = [];
+/**
+ * SGR mouse button mask: extracts the button number from the Pb field.
+ * Bits 0-1 = button (0=left, 1=middle, 2=right, 3=none).
+ * Bits 6-7 = high button bits (64=scroll up, 65=scroll down).
+ * Bits 2-5 are modifiers/motion and are masked off.
+ */
+const SGR_BUTTON_MASK = 0x43;
+
+export function parseInput(data: Buffer | string): InputEvent[] {
+  const events: InputEvent[] = [];
   const str = typeof data === "string" ? data : data.toString("utf-8");
   let i = 0;
 
@@ -184,6 +210,39 @@ export function parseKeys(data: Buffer | string): KeyEvent[] {
       // Bare escape
       if (i + 1 >= str.length) { events.push({ type: "escape" }); i++; continue; }
       if (str[i + 1] === "[") {
+        // SGR mouse: ESC [ < Pb ; Px ; Py M  (press) or  ESC [ < Pb ; Px ; Py m  (release)
+        if (str[i + 2] === "<") {
+          const mEnd = str.indexOf("M", i + 3);
+          const mEndR = str.indexOf("m", i + 3);
+          // Pick whichever comes first (M=press, m=release)
+          let endPos = -1;
+          let isRelease = false;
+          if (mEnd !== -1 && (mEndR === -1 || mEnd < mEndR)) { endPos = mEnd; isRelease = false; }
+          else if (mEndR !== -1) { endPos = mEndR; isRelease = true; }
+          if (endPos !== -1) {
+            const parts = str.slice(i + 3, endPos).split(";");
+            if (parts.length === 3) {
+              const cb = parseInt(parts[0], 10);
+              const cx = parseInt(parts[1], 10);
+              const cy = parseInt(parts[2], 10);
+              const isMotion = !!(cb & 32);
+              const button = cb & SGR_BUTTON_MASK;
+              events.push({
+                type: "mouse",
+                button,
+                col: cx,
+                row: cy,
+                action: isRelease ? "release" : isMotion ? "motion" : "press",
+                shift: !!(cb & 4),
+                meta: !!(cb & 8),
+                ctrl: !!(cb & 16),
+              });
+              i = endPos + 1;
+              continue;
+            }
+          }
+        }
+
         // Parse full CSI sequence: ESC [ <params> <final byte>
         // Find the end of the sequence (final byte is 0x40-0x7E)
         let j = i + 2;

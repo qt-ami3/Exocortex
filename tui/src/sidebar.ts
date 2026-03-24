@@ -279,6 +279,68 @@ function pad(text: string, width: number): string {
   return text + " ".repeat(width - text.length);
 }
 
+// ── Display row layout ─────────────────────────────────────────────
+
+interface DisplayRow {
+  type: "label" | "delimiter" | "entry";
+  convIdx?: number;
+  text?: string;
+}
+
+/**
+ * Build the flat list of display rows from the conversation list.
+ * Used by both rendering and mouse hit-testing so the layout is
+ * defined in one place.
+ */
+function buildDisplayRows(convs: ConversationSummary[]): DisplayRow[] {
+  const pinnedCount = convs.filter(c => c.pinned).length;
+  const rows: DisplayRow[] = [];
+
+  if (pinnedCount > 0) {
+    rows.push({ type: "label", text: " Pinned" });
+    for (let i = 0; i < pinnedCount; i++) {
+      rows.push({ type: "entry", convIdx: i });
+    }
+    rows.push({ type: "delimiter" });
+  }
+  for (let i = pinnedCount; i < convs.length; i++) {
+    rows.push({ type: "entry", convIdx: i });
+  }
+
+  return rows;
+}
+
+// ── Mouse support ──────────────────────────────────────────────────
+
+/**
+ * Hit-test a screen row click to find which conversation index was clicked.
+ * Returns the convs[] index, or null if the click was on a non-entry row
+ * (header, separator, label, delimiter, or out of bounds).
+ *
+ * @param screenRow 1-based screen row
+ * @param sidebar current sidebar state
+ */
+export function sidebarHitTest(screenRow: number, sidebar: SidebarState): number | null {
+  // Rows 1-2 are header and separator — not clickable
+  if (screenRow <= 2) return null;
+
+  const displayRows = buildDisplayRows(sidebar.conversations);
+
+  // Screen row 3 = display row at scrollOffset
+  const displayIdx = (screenRow - 3) + sidebar.scrollOffset;
+  if (displayIdx < 0 || displayIdx >= displayRows.length) return null;
+
+  const dr = displayRows[displayIdx];
+  if (dr.type !== "entry") return null;
+  return dr.convIdx!;
+}
+
+/** Scroll the sidebar list by a number of entries (positive = down, negative = up). */
+export function scrollSidebar(sidebar: SidebarState, delta: number): void {
+  const maxOffset = Math.max(0, sidebar.conversations.length - 1);
+  sidebar.scrollOffset = Math.max(0, Math.min(sidebar.scrollOffset + delta, maxOffset));
+}
+
 // ── Rendering ───────────────────────────────────────────────────────
 
 export function renderSidebar(
@@ -308,25 +370,7 @@ export function renderSidebar(
 
   // Build display rows: section labels + delimiter + conversation entries
   const convs = sidebar.conversations;
-  const pinnedCount = convs.filter(c => c.pinned).length;
-
-  interface DisplayRow {
-    type: "label" | "delimiter" | "entry";
-    convIdx?: number;
-    text?: string;
-  }
-  const displayRows: DisplayRow[] = [];
-
-  if (pinnedCount > 0) {
-    displayRows.push({ type: "label", text: " Pinned" });
-    for (let i = 0; i < pinnedCount; i++) {
-      displayRows.push({ type: "entry", convIdx: i });
-    }
-    displayRows.push({ type: "delimiter" });
-  }
-  for (let i = pinnedCount; i < convs.length; i++) {
-    displayRows.push({ type: "entry", convIdx: i });
-  }
+  const displayRows = buildDisplayRows(convs);
 
   // Map selectedIndex (into convs[]) to display row index for scroll tracking
   let selectedDisplayIdx = 0;

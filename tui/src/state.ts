@@ -53,10 +53,14 @@ export interface EditMessageState {
   scrollOffset: number;     // for scrolling long lists
 }
 
-/** Cached layout values — set by the renderer, read by scroll functions. */
+/** Cached layout values — set by the renderer, read by scroll and mouse functions. */
 export interface LayoutCache {
   totalLines: number;      // total rendered message lines
   messageAreaHeight: number; // visible rows for messages
+  chatCol: number;         // 1-based column where chat area starts
+  sepAbove: number;        // row number of separator above prompt
+  firstInputRow: number;   // row number of first input line
+  sepBelow: number;        // row number of separator below prompt
 }
 
 export interface RenderState {
@@ -122,6 +126,8 @@ export interface RenderState {
   pendingAISplitOffset: number;
   /** Images pasted from clipboard, waiting to be sent with the next message. */
   pendingImages: ImageAttachment[];
+  /** Current mouse cursor shape — used to avoid redundant cursor shape OSC writes. */
+  mouseCursor: "pointer" | "text" | "hand";
 }
 
 /** Streaming state is derived from pendingAI — no separate boolean. */
@@ -153,7 +159,7 @@ export function createInitialState(): RenderState {
     chatFocus: "prompt",
     sidebar: createSidebarState(),
     vim: createVimState(),
-    layout: { totalLines: 0, messageAreaHeight: 0 },
+    layout: { totalLines: 0, messageAreaHeight: 0, chatCol: 1, sepAbove: 0, firstInputRow: 0, sepBelow: 0 },
     pendingSend: { active: false, text: "" },
     systemMessageBuffer: [],
     toolRegistry: [],
@@ -172,6 +178,7 @@ export function createInitialState(): RenderState {
     editMessagePrompt: null,
     pendingAISplitOffset: 0,
     pendingImages: [],
+    mouseCursor: "pointer",
   };
   // App starts in insert mode — mark entry so first Esc commits the session
   markInsertEntry(s.undo, s.inputBuffer, s.cursorPos);

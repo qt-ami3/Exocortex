@@ -200,9 +200,13 @@ export function render(state: RenderState): void {
     state.scrollOffset = Math.max(0, state.scrollOffset + (totalLines - prevTotal));
   }
 
-  // Cache layout for scroll functions
+  // Cache layout for scroll and mouse functions
   state.layout.totalLines = totalLines;
   state.layout.messageAreaHeight = messageAreaHeight;
+  state.layout.chatCol = chatCol;
+  state.layout.sepAbove = sepAbove;
+  state.layout.firstInputRow = firstInputRow;
+  state.layout.sepBelow = sepBelow;
 
   let viewStart: number;
   if (state.scrollOffset === 0) {
