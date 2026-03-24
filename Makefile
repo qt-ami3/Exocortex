@@ -3,6 +3,7 @@
 # Usage:
 #   make install     Install everything (deps, commands, systemd service)
 #   make uninstall   Remove commands and systemd service
+#   make windows     Cross-compile Windows executables to dist/
 
 PREFIX    := $(HOME)/.local
 BIN_DIR   := $(PREFIX)/bin
@@ -13,7 +14,7 @@ REPO_DIR  := $(CURDIR)
 # ── Targets ──────────────────────────────────────────────────────────
 
 .PHONY: install uninstall check-bun deps links service login \
-        remove-links remove-service status
+        remove-links remove-service status windows clean-windows
 
 install: check-bun deps links service
 	@printf '\n  ✓ Exocortex installed.\n'
@@ -80,3 +81,20 @@ status:
 
 login:
 	@cd $(REPO_DIR)/daemon && bun run src/main.ts login
+
+# ── Windows cross-compilation ────────────────────────────────────
+
+DIST_DIR := $(REPO_DIR)/dist
+
+windows: check-bun
+	@mkdir -p $(DIST_DIR)
+	@printf '  Building Windows executables...\n'
+	@bun build --compile --target=bun-windows-x64 daemon/src/main.ts --outfile $(DIST_DIR)/exocortexd.exe
+	@bun build --compile --target=bun-windows-x64 tui/src/main.ts --outfile $(DIST_DIR)/exocortex.exe
+	@bun build --compile --target=bun-windows-x64 external-tools/exo-cli/src/main.ts --outfile $(DIST_DIR)/exo.exe
+	@printf '  ✓ Built dist/exocortexd.exe, dist/exocortex.exe, dist/exo.exe\n'
+	@ls -lh $(DIST_DIR)/*.exe
+
+clean-windows:
+	@rm -rf $(DIST_DIR)
+	@printf '  ✓ Cleaned dist/\n'

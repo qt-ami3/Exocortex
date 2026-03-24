@@ -31,7 +31,7 @@ Windows only sends SIGINT (Ctrl+C). SIGTERM doesn't exist. Add
 `process.on("exit", cleanup)` as a fallback alongside the existing
 SIGINT/SIGTERM handlers in `daemon/src/main.ts`.
 
-### 6. Cross-compile from Linux
+### ~~6. Cross-compile from Linux~~ ✅
 Set up build commands:
 ```bash
 bun build --compile --target=bun-windows-x64 daemon/src/main.ts --outfile dist/exocortexd.exe
