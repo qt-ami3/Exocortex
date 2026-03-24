@@ -13,8 +13,7 @@ import type { KeyResult } from "./focus";
 import { scrollBy, getViewStart } from "./chat";
 import { sidebarHitTest, scrollSidebar, syncSelectedIndex, SIDEBAR_WIDTH } from "./sidebar";
 import { mouse_cursor_pointer, mouse_cursor_text, mouse_cursor_hand } from "./terminal";
-import { clampCol, ensureCursorVisible, getHistoryVisualSelection } from "./historycursor";
-import { copyToClipboard } from "./vim/clipboard";
+import { clampCol, ensureCursorVisible } from "./historycursor";
 
 // ── Constants ─────────────────────────────────────────────────────
 
