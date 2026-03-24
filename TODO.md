@@ -40,7 +40,7 @@ bun build --compile --target=bun-windows-x64 cli/src/main.ts --outfile dist/exo.
 ```
 Add a `make windows` target to the Makefile.
 
-### 7. Create a launcher
+### ~~7. Create a launcher~~ ✅
 A single entry-point `.exe` that:
 - Starts `exocortexd.exe` in the background (hidden console)
 - Launches `exocortex.exe` (TUI) in the current console window

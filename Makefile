@@ -92,8 +92,9 @@ windows: check-bun
 	@bun build --compile --target=bun-windows-x64 daemon/src/main.ts --outfile $(DIST_DIR)/exocortexd.exe
 	@bun build --compile --target=bun-windows-x64 tui/src/main.ts --outfile $(DIST_DIR)/exocortex.exe
 	@bun build --compile --target=bun-windows-x64 external-tools/exo-cli/src/main.ts --outfile $(DIST_DIR)/exo.exe
-	@printf '  ✓ Built dist/exocortexd.exe, dist/exocortex.exe, dist/exo.exe\n'
-	@ls -lh $(DIST_DIR)/*.exe
+	@cp $(REPO_DIR)/scripts/exocortex.bat $(DIST_DIR)/exocortex.bat
+	@printf '  ✓ Built dist/exocortexd.exe, dist/exocortex.exe, dist/exo.exe, dist/exocortex.bat\n'
+	@ls -lh $(DIST_DIR)/
 
 clean-windows:
 	@rm -rf $(DIST_DIR)
