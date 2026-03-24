@@ -21,7 +21,7 @@ Also fix process group handling: Windows doesn't have `kill(-pgid)`, use
 `tui/src/clipboard.ts` — add a `powershell` backend that uses
 `powershell -Command Get-Clipboard` for text and image clipboard reading.
 
-### 4. Replace hardcoded `/tmp/`
+### ~~4. Replace hardcoded `/tmp/`~~ ✅
 `daemon/src/tools/bash.ts` uses `/tmp/exocortex-bash-*.txt` for spill files.
 Replace with `os.tmpdir()` which returns `C:\Users\...\AppData\Local\Temp`
 on Windows.
