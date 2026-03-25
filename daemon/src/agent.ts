@@ -41,7 +41,7 @@ export interface AgentCallbacks {
   /** A tool-use round completed — all tool results received, next API call starting. */
   onRoundComplete?(): void;
   /**
-   * Drain "next-turn" queued messages between rounds.
+   * Drain "next-turn" queued messages between tool rounds.
    * Called after onRoundComplete — returns user messages to inject
    * into the conversation before the next API call.
    */
@@ -337,9 +337,7 @@ export async function runAgentLoop(
     }
     callbacks.onRoundComplete?.();
 
-    // Inject "next-turn" queued messages between rounds.
-    // Only completedMessages is updated — user messages don't produce
-    // display blocks, so completedBlocks stays unchanged.
+    // Inject "next-turn" queued messages between tool rounds.
     const nextTurn = callbacks.drainNextTurnMessages?.() ?? [];
     for (const qm of nextTurn) {
       messages.push(qm);

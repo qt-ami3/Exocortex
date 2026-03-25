@@ -141,10 +141,7 @@ function handleSubmit(): void {
       state.messages.push({ role: "system", text: "⚠ Images can't be queued — only text will be sent.", color: theme.warning, metadata: null });
     }
     // Show queue prompt overlay — let user choose when to send
-    state.queuePrompt = {
-      text: messageText,
-      selection: "message-end",
-    };
+    state.queuePrompt = { text: messageText, selection: "message-end" };
     scheduleRender();
     return;
   }
@@ -189,7 +186,6 @@ function handleKey(key: KeyEvent): void {
         // No images — queue system is text-only (images cleared on queue entry)
         sendDirectly(qr.text);
       } else if (qr.action === "queue") {
-        // Send queue command to daemon — it handles injection timing
         daemon.queueMessage(qr.convId, qr.text, qr.timing);
       }
       break;

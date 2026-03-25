@@ -98,6 +98,11 @@ export async function orchestrateSendMessage(
   // can rebuild its local message array from the mutated conv.messages.
   let contextModifiedThisRound = false;
 
+  // Track whether any next-turn messages were injected mid-stream.
+  // When true, the success path sends history_updated so the TUI
+  // rebuilds its display with correct interleaving.
+  let hadNextTurnInjections = false;
+
   // The current user message is the last entry in conv.messages.
   // All messages from the current agent loop (newMessages) aren't in
   // conv.messages yet. So protectedTailCount = 1 (just the user msg).
@@ -226,15 +231,13 @@ export async function orchestrateSendMessage(
       const drained = convStore.drainQueuedMessages(convId, "next-turn");
       if (drained.length === 0) return [];
 
+      hadNextTurnInjections = true;
       const apiMsgs: import("./messages").ApiMessage[] = [];
       for (const qm of drained) {
-        // Don't push to conv.messages here — the agent loop includes
-        // injected messages in newMessages/completedMessages, and the
-        // normal persistence path (success or abort) pushes them to
-        // conv.messages in the correct order.
-        // Broadcast to TUI subscribers so they see the queued message appear
+        // Broadcast to TUI subscribers so they see the queued message appear.
+        // Don't push to conv.messages — the agent loop includes injected
+        // messages in newMessages, which get pushed on the success/abort path.
         server.sendToSubscribers(convId, { type: "user_message", convId, text: qm.text });
-        // Build API-level message for the agent loop
         apiMsgs.push({ role: "user", content: qm.text });
         log("info", `orchestrator: injected next-turn message: "${qm.text.slice(0, 50)}"`);
       }
@@ -265,12 +268,27 @@ export async function orchestrateSendMessage(
     },
   };
 
+  // Wrap the raw executor to keep the watchdog happy during long tool
+  // executions. Without this, the stale-stream watchdog aborts the
+  // AbortController after STALE_STREAM_TIMEOUT of inactivity — but
+  // tool execution (e.g. bash with await=600) produces no SSE events,
+  // so touchActivity never fires and the watchdog false-triggers.
+  const rawExecutor = buildExecutor(contextEnv);
+  const executor: typeof rawExecutor = async (calls, signal?) => {
+    const keepalive = setInterval(() => convStore.touchActivity(convId), 60_000);
+    try {
+      return await rawExecutor(calls, signal);
+    } finally {
+      clearInterval(keepalive);
+    }
+  };
+
   try {
     const result = await runAgentLoop(apiMessages, conv.model, callbacks, {
       system: buildSystemPrompt(),
       signal: ac.signal,
       tools: getToolDefs(),
-      executor: buildExecutor(contextEnv),
+      executor,
       summarizer: (name, input) => {
         const s = summarizeTool(name, input);
         return s.detail || s.label;
@@ -311,6 +329,25 @@ export async function orchestrateSendMessage(
       tokens: result.tokens,
     });
 
+    // When next-turn messages were injected mid-stream, the TUI's live
+    // display has the user message appended after all streaming blocks
+    // (slightly wrong position). Now that conv.messages has the correct
+    // interleaved structure, send history_updated so the TUI rebuilds
+    // with proper ordering (AI part 1 → user msg → AI part 2).
+    if (hadNextTurnInjections) {
+      convStore.markDirty(convId);
+      convStore.flush(convId);
+      const displayData = convStore.getDisplayData(convId);
+      if (displayData) {
+        server.sendToSubscribers(convId, {
+          type: "history_updated",
+          convId,
+          entries: displayData.entries,
+          contextTokens: displayData.contextTokens,
+        });
+      }
+    }
+
     log("info", `orchestrator: message complete for ${convId} (${result.tokens} tokens, ${result.blocks.length} blocks, ${endedAt - startedAt}ms)`);
 
     // Mark unread if no client is viewing this conversation
@@ -326,10 +363,14 @@ export async function orchestrateSendMessage(
   } catch (err) {
     const isAbort = ac.signal.aborted;
 
+    const isWatchdog = isAbort && ac.signal.reason === "watchdog";
+
     if (!isAbort) {
       const msg = err instanceof Error ? err.message : String(err);
       log("error", `orchestrator: stream error for ${convId}: ${msg}`);
       server.sendToSubscribers(convId, { type: "error", convId, message: msg });
+    } else if (isWatchdog) {
+      log("warn", `orchestrator: stream timed out for ${convId} (watchdog)`);
     } else {
       log("info", `orchestrator: stream interrupted for ${convId}`);
     }
@@ -391,7 +432,11 @@ export async function orchestrateSendMessage(
     }
 
     // Persist and broadcast system message
-    if (isAbort) {
+    if (isWatchdog) {
+      const sysText = "✗ Timed out (stale stream)";
+      conv.messages.push({ role: "system", content: sysText, metadata: null });
+      server.sendToSubscribers(convId, { type: "system_message", convId, text: sysText, color: "error" });
+    } else if (isAbort) {
       const sysText = "✗ Interrupted";
       conv.messages.push({ role: "system", content: sysText, metadata: null });
       server.sendToSubscribers(convId, { type: "system_message", convId, text: sysText, color: "error" });
@@ -412,10 +457,10 @@ export async function orchestrateSendMessage(
     server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(convId)! });
     ext.onComplete();
 
-    // Drain all remaining queued messages — send the first as a new turn,
-    // re-queue the rest (they'll drain on the next streaming_stopped).
-    // A single drain-all avoids double-sending next-turn messages that
-    // were already injected by drainNextTurnMessages during the agent loop.
+    // Drain remaining queued messages. "next-turn" messages that weren't
+    // injected mid-stream (e.g. no tool rounds, or queued too late) end up
+    // here alongside "message-end" messages. Send the first as a new turn,
+    // re-queue the rest — they'll drain on the next streaming_stopped.
     const allQueued = convStore.drainQueuedMessages(convId);
     if (allQueued.length > 0) {
       const first = allQueued[0];
@@ -423,10 +468,11 @@ export async function orchestrateSendMessage(
       for (let i = 1; i < allQueued.length; i++) {
         convStore.pushQueuedMessage(convId, allQueued[i].text, allQueued[i].timing);
       }
-      log("info", `orchestrator: draining queued message-end: "${first.text.slice(0, 50)}"`);
-      // Kick off a new send cycle — null client so user_message broadcasts to everyone
-      // (the originating client's local queue shadow was already cleared)
-      orchestrateSendMessage(server, null, undefined, convId, first.text, Date.now(), ext);
+      log("info", `orchestrator: draining queued message: "${first.text.slice(0, 50)}"`);
+      // Kick off a new send cycle — null client so user_message broadcasts to everyone.
+      // Await to keep the chain in a single promise so errors propagate and
+      // the conversation stays consistent (no orphaned background streams).
+      await orchestrateSendMessage(server, null, undefined, convId, first.text, Date.now(), ext);
     }
   }
 }

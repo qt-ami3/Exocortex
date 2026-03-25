@@ -3,8 +3,9 @@
  *
  * When the user submits a message while the AI is still streaming,
  * a modal appears letting them choose when to deliver it:
- * - "next turn": injected between tool-use rounds (ASAP)
- * - "message end": sent after the full AI turn finishes
+ * - "message end": sent after the current stream ends
+ * - "next turn": injected between tool-use rounds if possible,
+ *   otherwise sent after the stream ends
  *
  * j/k and arrow keys toggle the selection. Enter confirms, Escape cancels.
  *

@@ -173,28 +173,28 @@ export function pushQueuedMessage(convId: string, text: string, timing: QueueTim
 }
 
 /**
- * Drain queued messages with the given timing. Removes and returns them.
- * If timing is omitted, drains all queued messages.
+ * Drain queued messages. Removes and returns them.
+ * If timing is given, only drains messages with that timing.
+ * If omitted, drains all.
  */
 export function drainQueuedMessages(convId: string, timing?: QueueTiming): QueuedMessage[] {
   const queue = messageQueues.get(convId);
   if (!queue || queue.length === 0) return [];
 
+  if (timing === undefined) {
+    messageQueues.delete(convId);
+    return queue;
+  }
+
   const drained: QueuedMessage[] = [];
   const remaining: QueuedMessage[] = [];
   for (const qm of queue) {
-    if (timing === undefined || qm.timing === timing) {
-      drained.push(qm);
-    } else {
-      remaining.push(qm);
-    }
+    if (qm.timing === timing) drained.push(qm);
+    else remaining.push(qm);
   }
 
-  if (remaining.length === 0) {
-    messageQueues.delete(convId);
-  } else {
-    messageQueues.set(convId, remaining);
-  }
+  if (remaining.length === 0) messageQueues.delete(convId);
+  else messageQueues.set(convId, remaining);
   return drained;
 }
 

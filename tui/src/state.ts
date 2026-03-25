@@ -121,9 +121,6 @@ export interface RenderState {
   queuedMessages: QueuedMessage[];
   /** Edit message modal — non-null when the modal is showing. */
   editMessagePrompt: EditMessageState | null;
-  /** Number of pendingAI blocks already finalized into split AI messages
-   *  (from next-turn queued message injection during streaming). */
-  pendingAISplitOffset: number;
   /** Images pasted from clipboard, waiting to be sent with the next message. */
   pendingImages: ImageAttachment[];
   /** Current mouse cursor shape — used to avoid redundant cursor shape OSC writes. */
@@ -138,7 +135,6 @@ export function isStreaming(state: RenderState): boolean {
 /** Clear pending AI state — always use this instead of setting pendingAI = null directly. */
 export function clearPendingAI(state: RenderState): void {
   state.pendingAI = null;
-  state.pendingAISplitOffset = 0;
 }
 
 export function createInitialState(): RenderState {
@@ -176,7 +172,6 @@ export function createInitialState(): RenderState {
     queuePrompt: null,
     queuedMessages: [],
     editMessagePrompt: null,
-    pendingAISplitOffset: 0,
     pendingImages: [],
     mouseCursor: "pointer",
   };

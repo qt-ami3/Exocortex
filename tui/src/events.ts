@@ -171,13 +171,9 @@ export function handleEvent(
     case "message_complete": {
       if (event.convId !== state.convId) break;
       if (state.pendingAI) {
-        if (state.pendingAISplitOffset === 0) {
-          // Normal case — use the daemon's canonical data (catches anything
-          // a late-joining client missed during streaming).
-          state.pendingAI.blocks = event.blocks;
-        }
-        // When splits happened, earlier blocks are already finalized in
-        // state.messages — keep the blocks that arrived via streaming.
+        // Use the daemon's canonical blocks — catches anything a late-joining
+        // client missed during streaming.
+        state.pendingAI.blocks = event.blocks;
         state.pendingAI.metadata!.endedAt = event.endedAt;
         state.pendingAI.metadata!.tokens = event.tokens;
         state.messages.push(state.pendingAI);
@@ -192,12 +188,7 @@ export function handleEvent(
       // On abort/error, pendingAI is still live — finalize with persisted blocks.
       if (state.pendingAI) {
         if (event.persistedBlocks !== undefined) {
-          if (state.pendingAISplitOffset > 0) {
-            // Earlier blocks already finalized — only apply the remainder
-            state.pendingAI.blocks = event.persistedBlocks.slice(state.pendingAISplitOffset);
-          } else {
-            state.pendingAI.blocks = event.persistedBlocks;
-          }
+          state.pendingAI.blocks = event.persistedBlocks;
         }
         if (state.pendingAI.blocks.length > 0) {
           state.pendingAI.metadata!.endedAt ??= Date.now();
@@ -333,19 +324,15 @@ export function handleEvent(
 
       // During streaming: split pendingAI so the user message appears
       // inline between tool rounds (after completed blocks, before new ones).
+      // This is purely for visual correctness during streaming — after
+      // completion, history_updated rebuilds from canonical daemon state.
       if (state.pendingAI && state.pendingAI.blocks.length > 0) {
-        // Finalize current blocks as an intermediate AI message (no metadata footer)
         const finalized: AIMessage = {
           role: "assistant",
           blocks: [...state.pendingAI.blocks],
           metadata: null,
         };
         state.messages.push(finalized);
-
-        // Track how many blocks were split off for message_complete / streaming_stopped
-        state.pendingAISplitOffset += state.pendingAI.blocks.length;
-
-        // Create fresh pendingAI for subsequent streaming blocks
         state.pendingAI = createPendingAI(
           state.pendingAI.metadata!.startedAt,
           state.pendingAI.metadata!.model,
