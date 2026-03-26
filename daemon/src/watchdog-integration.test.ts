@@ -12,10 +12,10 @@
  *
  * Scenario 2 — Long tool call (5m+):
  *   A tool (e.g. `bash` with await=600) takes minutes to complete. The
- *   orchestrator wraps the executor with a keepalive interval that calls
- *   touchActivity() every 60s. This keeps the stream "alive" from the
- *   watchdog's perspective, preventing false aborts. When the tool
- *   finishes, the keepalive clears and normal staleness detection resumes.
+ *   orchestrator pauses staleness tracking before tool execution and
+ *   resumes it after. The watchdog ignores paused streams entirely —
+ *   tools can run for hours. When the tool finishes, resumeActivity()
+ *   resets the clock and normal staleness detection resumes.
  *
  * These tests use artificially fast intervals (50-100ms vs 60s in prod)
  * and faked timestamps (set startedAt to STALE_STREAM_TIMEOUT ago) to
@@ -26,7 +26,8 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import {
   setActiveJob, clearActiveJob, isStreaming,
-  touchActivity, getStaleStreams, STALE_STREAM_TIMEOUT,
+  touchActivity, pauseActivity, resumeActivity,
+  getStaleStreams, STALE_STREAM_TIMEOUT,
 } from "./streaming";
 
 // ── Fast watchdog for testing ─────────────────────────────────────
@@ -198,83 +199,78 @@ describe("scenario 1: model hangs → watchdog aborts", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// SCENARIO 2: Long tool call (5m+) → keepalive prevents abort
+// SCENARIO 2: Long tool call → pause/resume makes watchdog ignore it
 // ═══════════════════════════════════════════════════════════════════
 
-describe("scenario 2: long tool call → keepalive prevents abort", () => {
-  test("touchActivity resets staleness — keepalive keeps stream alive", async () => {
-    // Stream started long ago (normally stale)
+describe("scenario 2: long tool call → paused stream is invisible to watchdog", () => {
+  test("pauseActivity makes a stale stream invisible to getStaleStreams", () => {
     const ac = new AbortController();
-    const startedAt = Date.now() - STALE_STREAM_TIMEOUT - 1_000;
-    setActiveJob("wd-int-1", ac, startedAt);
+    const past = Date.now() - STALE_STREAM_TIMEOUT - 1_000;
+    setActiveJob("wd-int-1", ac, past);
 
-    // Before keepalive: stale
+    // Stale before pause
     expect(getStaleStreams()).toHaveLength(1);
 
-    // Single touchActivity resets the clock
-    touchActivity("wd-int-1");
-
-    // After touch: not stale
+    // Pause — stream disappears from stale list
+    pauseActivity("wd-int-1");
     expect(getStaleStreams()).toHaveLength(0);
-    expect(ac.signal.aborted).toBe(false);
   });
 
-  test("watchdog does NOT abort stream during active keepalive", async () => {
-    // Stream started long ago
+  test("resumeActivity restores tracking with a fresh clock", () => {
     const ac = new AbortController();
-    setActiveJob("wd-int-1", ac, Date.now() - STALE_STREAM_TIMEOUT - 1_000);
+    const past = Date.now() - STALE_STREAM_TIMEOUT - 1_000;
+    setActiveJob("wd-int-1", ac, past);
 
-    // Immediately touch (simulates: tool execution just began)
-    touchActivity("wd-int-1");
+    pauseActivity("wd-int-1");
+    expect(getStaleStreams()).toHaveLength(0);
 
-    // Start keepalive (mirrors orchestrator.ts executor wrapper):
-    //   const keepalive = setInterval(() => convStore.touchActivity(convId), 60_000);
-    // Using 50ms here instead of 60s
-    const keepalive = setInterval(() => touchActivity("wd-int-1"), 50);
+    // Resume resets the activity timestamp — stream is fresh, not stale
+    resumeActivity("wd-int-1");
+    expect(getStaleStreams()).toHaveLength(0);
+  });
 
-    // Run watchdog concurrently (also checking every 50ms)
+  test("watchdog does NOT abort a paused stream (tool executing for hours)", async () => {
+    // Stream started long ago — would be stale without pause
+    const ac = new AbortController();
+    const past = Date.now() - STALE_STREAM_TIMEOUT - 1_000;
+    setActiveJob("wd-int-1", ac, past);
+
+    // Pause (tool execution begins)
+    pauseActivity("wd-int-1");
+
+    // Run watchdog aggressively
     const wd = createTestWatchdog(50);
     wd.start();
-
-    // Let both run for 500ms — in production this would be 5-30 minutes
-    // of tool execution, with the keepalive firing every 60s.
     await Bun.sleep(500);
-
-    // Clean up
-    clearInterval(keepalive);
     wd.stop();
 
-    // Stream should be completely unharmed
+    // Stream untouched — watchdog skipped it entirely
     expect(ac.signal.aborted).toBe(false);
-    expect(isStreaming("wd-int-1")).toBe(true);
     expect(wd.events).toHaveLength(0);
   });
 
-  test("executor wrapper pattern: keepalive active during tool, cleaned up after", async () => {
-    // This test mirrors the exact pattern from orchestrator.ts:
+  test("executor wrapper pattern: pause during tool, resume after", async () => {
+    // Mirrors the exact pattern from orchestrator.ts:
     //
-    //   const rawExecutor = buildExecutor(contextEnv);
     //   const executor: typeof rawExecutor = async (calls, signal?) => {
-    //     const keepalive = setInterval(() => convStore.touchActivity(convId), 60_000);
+    //     convStore.pauseActivity(convId);
     //     try {
     //       return await rawExecutor(calls, signal);
     //     } finally {
-    //       clearInterval(keepalive);
+    //       convStore.resumeActivity(convId);
     //     }
     //   };
 
     const ac = new AbortController();
     setActiveJob("wd-int-1", ac, Date.now());
 
-    // Simulated executor wrapper (identical logic, faster intervals)
     const fakeExecutor = async (durationMs: number): Promise<string> => {
-      const keepalive = setInterval(() => touchActivity("wd-int-1"), 50);
+      pauseActivity("wd-int-1");
       try {
-        // Simulate long-running tool (e.g. bash with await=600)
         await Bun.sleep(durationMs);
         return "tool output: compilation succeeded";
       } finally {
-        clearInterval(keepalive);
+        resumeActivity("wd-int-1");
       }
     };
 
@@ -282,49 +278,34 @@ describe("scenario 2: long tool call → keepalive prevents abort", () => {
     const wd = createTestWatchdog(50);
     wd.start();
 
-    // Execute the "long" tool call
     const result = await fakeExecutor(400);
 
     wd.stop();
 
-    // Tool completed successfully, stream never aborted
     expect(result).toBe("tool output: compilation succeeded");
     expect(ac.signal.aborted).toBe(false);
     expect(wd.events).toHaveLength(0);
   });
 
   test("stream becomes stale AFTER tool completes if model then hangs", async () => {
-    // This tests the transition: tool executing (keepalive active) →
-    // tool done (keepalive stops) → model hangs → watchdog catches it.
-    //
-    // In production:
-    // 1. Tool runs for 10 minutes, keepalive fires every 60s → safe
-    // 2. Tool returns result, keepalive cleared in `finally`
-    // 3. Agent loop sends tool_result to API, streams next response
-    // 4. If the API hangs here, no more touchActivity calls → stale after 5m
-
+    // Tool executing (paused) → tool done (resumed) → model hangs → caught
     const ac = new AbortController();
     setActiveJob("wd-int-1", ac, Date.now());
 
-    // Phase 1: tool executing with keepalive
-    const keepalive = setInterval(() => touchActivity("wd-int-1"), 50);
+    // Phase 1: tool executing — paused
+    pauseActivity("wd-int-1");
     await Bun.sleep(200);
 
-    // Phase 2: tool done, keepalive clears (as in the `finally` block)
-    clearInterval(keepalive);
-
-    // Still fresh (touchActivity just fired)
+    // Phase 2: tool done — resumed (clock reset)
+    resumeActivity("wd-int-1");
     expect(getStaleStreams()).toHaveLength(0);
-    expect(ac.signal.aborted).toBe(false);
 
-    // Phase 3: simulate time passing with no activity (model hangs)
-    // In production this is 5 minutes of wall clock time.
-    // We fake it by re-registering with a stale timestamp.
+    // Phase 3: model hangs — simulate elapsed time
     clearActiveJob("wd-int-1");
     const ac2 = new AbortController();
     setActiveJob("wd-int-1", ac2, Date.now() - STALE_STREAM_TIMEOUT - 1_000);
 
-    // Phase 4: watchdog catches the stale stream
+    // Phase 4: watchdog catches it
     const wd = createTestWatchdog(50);
     wd.start();
     await Bun.sleep(200);
@@ -335,16 +316,15 @@ describe("scenario 2: long tool call → keepalive prevents abort", () => {
     expect(wd.events).toHaveLength(1);
   });
 
-  test("mixed: one stream has keepalive (safe), another is stale (aborted)", async () => {
+  test("mixed: one stream paused (tool running), another stale (model hung)", async () => {
     const past = Date.now() - STALE_STREAM_TIMEOUT - 1_000;
 
-    // Stream 1: long tool call with keepalive
+    // Stream 1: tool executing (paused)
     const ac1 = new AbortController();
     setActiveJob("wd-int-1", ac1, past);
-    touchActivity("wd-int-1"); // tool just started
-    const keepalive = setInterval(() => touchActivity("wd-int-1"), 50);
+    pauseActivity("wd-int-1");
 
-    // Stream 2: model hung, no activity
+    // Stream 2: model hung (not paused)
     const ac2 = new AbortController();
     setActiveJob("wd-int-2", ac2, past);
 
@@ -353,16 +333,14 @@ describe("scenario 2: long tool call → keepalive prevents abort", () => {
     wd.start();
     await Bun.sleep(200);
     wd.stop();
-    clearInterval(keepalive);
 
-    // Stream 1: safe (keepalive kept it alive)
+    // Stream 1: safe (paused — watchdog ignored it)
     expect(ac1.signal.aborted).toBe(false);
 
-    // Stream 2: aborted (no activity)
+    // Stream 2: aborted (stale, not paused)
     expect(ac2.signal.aborted).toBe(true);
     expect(ac2.signal.reason).toBe("watchdog");
 
-    // Only stream 2 was aborted
     expect(wd.events).toHaveLength(1);
     expect(wd.events[0].convId).toBe("wd-int-2");
   });

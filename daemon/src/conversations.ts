@@ -18,7 +18,7 @@ import { log } from "./log";
 export {
   isStreaming, setActiveJob, getActiveJob, clearActiveJob, getStreamingStartedAt,
   setStreamingTokens, getStreamingTokens,
-  touchActivity,
+  touchActivity, pauseActivity, resumeActivity,
   resetChunkCounter,
   initStreamingBlocks, getStreamingBlocks, pushStreamingBlock, appendToStreamingBlock, clearStreamingBlocks,
   getQueuedMessages, pushQueuedMessage, drainQueuedMessages, clearQueuedMessages, removeQueuedMessage,

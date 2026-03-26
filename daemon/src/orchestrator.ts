@@ -273,18 +273,17 @@ export async function orchestrateSendMessage(
     },
   };
 
-  // Wrap the raw executor to keep the watchdog happy during long tool
-  // executions. Without this, the stale-stream watchdog aborts the
-  // AbortController after STALE_STREAM_TIMEOUT of inactivity — but
-  // tool execution (e.g. bash with await=600) produces no SSE events,
-  // so touchActivity never fires and the watchdog false-triggers.
+  // Pause staleness tracking during tool execution. Tools can run for
+  // hours (e.g. kernel builds, long test suites) — the watchdog has no
+  // business timing them out. When tools finish, resume tracking so the
+  // watchdog catches a hung model on the *next* API streaming call.
   const rawExecutor = buildExecutor(contextEnv);
   const executor: typeof rawExecutor = async (calls, signal?) => {
-    const keepalive = setInterval(() => convStore.touchActivity(convId), 60_000);
+    convStore.pauseActivity(convId);
     try {
       return await rawExecutor(calls, signal);
     } finally {
-      clearInterval(keepalive);
+      convStore.resumeActivity(convId);
     }
   };
 
