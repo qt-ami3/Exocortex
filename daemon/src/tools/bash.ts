@@ -314,7 +314,13 @@ async function executeBashImpl(
 
 function summarize(input: Record<string, unknown>): ToolSummary {
   const command = getString(input, "command") ?? "";
-  return { label: "$", detail: command };
+  const flags: string[] = [];
+  const awaitSec = getNumber(input, "await");
+  if (awaitSec != null) flags.push(`--await ${awaitSec}`);
+  const timeout = getNumber(input, "timeout");
+  if (timeout != null) flags.push(`--timeout ${timeout}`);
+  const detail = flags.length ? `${command} ${flags.join(" ")}` : command;
+  return { label: "$", detail };
 }
 
 // ── Tool definition ────────────────────────────────────────────────

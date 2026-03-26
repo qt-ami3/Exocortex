@@ -116,7 +116,9 @@ async function executeEdit(input: Record<string, unknown>): Promise<ToolResult> 
 
 function summarize(input: Record<string, unknown>): ToolSummary {
   const filePath = getString(input, "file_path") ?? "";
-  return { label: "Edit", detail: filePath };
+  const replaceAll = getBoolean(input, "replace_all");
+  const detail = replaceAll ? `${filePath} --replace-all` : filePath;
+  return { label: "Edit", detail };
 }
 
 // ── Tool definition ────────────────────────────────────────────────
