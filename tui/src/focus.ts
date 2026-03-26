@@ -13,6 +13,7 @@
 
 import type { KeyEvent } from "./input";
 import type { RenderState } from "./state";
+import { focusPrompt, focusHistory, focusSidebar } from "./state";
 import type { Action } from "./keybinds";
 import { resolveAction } from "./keybinds";
 import {
@@ -93,9 +94,7 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
     state.cursorPos = pos + text.length;
     state.autocomplete = null;
     // Ensure prompt is focused and in insert mode
-    state.panelFocus = "chat";
-    state.chatFocus = "prompt";
-    if (state.vim.mode !== "insert") state.vim.mode = "insert";
+    focusPrompt(state);
     return { type: "handled" };
   }
 
@@ -107,20 +106,24 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
       return { type: "quit" };
     case "sidebar_toggle":
       state.sidebar.open = !state.sidebar.open;
-      state.panelFocus = state.sidebar.open ? "sidebar" : "chat";
-      if (state.panelFocus === "sidebar") {
-        state.vim.mode = "normal";
+      if (state.sidebar.open) {
+        focusSidebar(state);
         // Default cursor to the current conversation
         if (state.convId) {
           state.sidebar.selectedId = state.convId;
           syncSelectedIndex(state.sidebar);
         }
+      } else {
+        state.panelFocus = "chat";
       }
       return { type: "handled" };
     case "focus_cycle":
       if (state.sidebar.open) {
-        state.panelFocus = state.panelFocus === "sidebar" ? "chat" : "sidebar";
-        if (state.panelFocus === "sidebar") state.vim.mode = "normal";
+        if (state.panelFocus === "sidebar") {
+          state.panelFocus = "chat";
+        } else {
+          focusSidebar(state);
+        }
       }
       return { type: "handled" };
     case "new_conversation":
@@ -131,12 +134,9 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
     case "focus_history":
       // Toggle: if already in history → back to prompt, otherwise → history
       if (state.panelFocus === "chat" && state.chatFocus === "history") {
-        state.chatFocus = "prompt";
-        state.vim.mode = "insert";
+        focusPrompt(state);
       } else {
-        state.panelFocus = "chat";
-        state.chatFocus = "history";
-        state.vim.mode = "normal";
+        focusHistory(state);
         state.historyCursor = placeAtVisibleBottom(state);
       }
       return { type: "handled" };
@@ -154,8 +154,7 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
           syncSelectedIndex(state.sidebar);
         }
       }
-      state.panelFocus = "sidebar";
-      state.vim.mode = "normal";
+      focusSidebar(state);
       moveSelection(state.sidebar, action === "sidebar_next" ? 1 : -1);
       return { type: "handled" };
     }
@@ -177,9 +176,7 @@ export function handleFocusedKey(key: KeyEvent, state: RenderState): KeyResult {
       if (img) {
         state.pendingImages.push(img);
         // Force focus to prompt in insert mode so user can type a caption
-        state.panelFocus = "chat";
-        state.chatFocus = "prompt";
-        if (state.vim.mode !== "insert") state.vim.mode = "insert";
+        focusPrompt(state);
       }
       return { type: "handled" };
     }
@@ -365,11 +362,7 @@ function handleVimAction(action: string, state: RenderState): KeyResult {
       return { type: "quit" };
     case "focus_prompt":
       // Vim i/a in sidebar/history → focus prompt + enter insert
-      state.vim.mode = "insert";
-      if (state.panelFocus === "sidebar") {
-        state.panelFocus = "chat";
-      }
-      state.chatFocus = "prompt";
+      focusPrompt(state);
       return { type: "handled" };
     case "nav_up":
       return handleContextNavigation("up", state);
