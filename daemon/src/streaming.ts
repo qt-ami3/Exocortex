@@ -34,6 +34,8 @@ const streamingTokens = new Map<string, number>();
 const messageQueues = new Map<string, QueuedMessage[]>();
 /** Last meaningful activity timestamp per streaming job (for stale stream detection). */
 const lastActivityAt = new Map<string, number>();
+/** Streams paused from staleness tracking (e.g. during tool execution). */
+const pausedStreams = new Set<string>();
 
 const CHUNK_SAVE_INTERVAL = 5;
 
@@ -62,6 +64,7 @@ export function clearActiveJob(convId: string): void {
   streamingStartedAt.delete(convId);
   streamingTokens.delete(convId);
   lastActivityAt.delete(convId);
+  pausedStreams.delete(convId);
 }
 
 export function getStreamingStartedAt(convId: string): number | undefined {
@@ -88,13 +91,32 @@ export function touchActivity(convId: string): void {
 }
 
 /**
+ * Pause staleness tracking for a stream (e.g. during tool execution).
+ * The watchdog ignores paused streams entirely — tools can run for hours.
+ */
+export function pauseActivity(convId: string): void {
+  if (activeJobs.has(convId)) pausedStreams.add(convId);
+}
+
+/**
+ * Resume staleness tracking for a stream (e.g. after tool execution).
+ * Resets the activity clock so the stream gets a fresh window.
+ */
+export function resumeActivity(convId: string): void {
+  pausedStreams.delete(convId);
+  if (activeJobs.has(convId)) lastActivityAt.set(convId, Date.now());
+}
+
+/**
  * Return all streams that have been inactive for longer than STALE_STREAM_TIMEOUT.
+ * Skips paused streams (tool execution in progress).
  * Returns [convId, AbortController, inactiveMs][] for the watchdog to act on.
  */
 export function getStaleStreams(): Array<[string, AbortController, number]> {
   const now = Date.now();
   const stale: Array<[string, AbortController, number]> = [];
   for (const [convId, ac] of activeJobs) {
+    if (pausedStreams.has(convId)) continue; // tools running — not our business
     const last = lastActivityAt.get(convId) ?? 0;
     const inactive = now - last;
     if (inactive >= STALE_STREAM_TIMEOUT) {
