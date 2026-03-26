@@ -123,7 +123,26 @@ async function executeGrep(input: Record<string, unknown>, signal?: AbortSignal)
 
 function summarize(input: Record<string, unknown>): ToolSummary {
   const pattern = getString(input, "pattern") ?? "";
-  return { label: "Grep", detail: `/${pattern}/` };
+  const parts: string[] = [`/${pattern}/`];
+  const path = getString(input, "path");
+  if (path) parts.push(path);
+  const globPat = getString(input, "glob");
+  if (globPat) parts.push(`--glob ${globPat}`);
+  const fileType = getString(input, "type");
+  if (fileType) parts.push(`--type ${fileType}`);
+  const mode = getString(input, "output_mode");
+  if (mode && mode !== "files_with_matches") parts.push(`--${mode}`);
+  if (getBoolean(input, "-i")) parts.push("-i");
+  const A = getNumber(input, "-A");
+  if (A != null) parts.push(`-A ${A}`);
+  const B = getNumber(input, "-B");
+  if (B != null) parts.push(`-B ${B}`);
+  const C = getNumber(input, "-C");
+  if (C != null) parts.push(`-C ${C}`);
+  if (getBoolean(input, "multiline")) parts.push("--multiline");
+  const headLimit = getNumber(input, "head_limit");
+  if (headLimit != null) parts.push(`--head ${headLimit}`);
+  return { label: "Grep", detail: parts.join(" ") };
 }
 
 // ── Tool definition ────────────────────────────────────────────────

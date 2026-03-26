@@ -119,7 +119,11 @@ async function executeGlob(input: Record<string, unknown>, signal?: AbortSignal)
 
 function summarize(input: Record<string, unknown>): ToolSummary {
   const pattern = getString(input, "pattern") ?? "";
-  return { label: "Glob", detail: pattern };
+  const parts: string[] = [pattern];
+  const path = getString(input, "path");
+  if (path) parts.push(`--path ${path}`);
+  if (getBoolean(input, "no_ignore")) parts.push("--no-ignore");
+  return { label: "Glob", detail: parts.join(" ") };
 }
 
 // ── Tool definition ───────────────────────────────────────────────

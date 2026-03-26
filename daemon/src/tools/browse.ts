@@ -184,7 +184,9 @@ async function executeBrowse(input: Record<string, unknown>, signal?: AbortSigna
 
 function summarize(input: Record<string, unknown>): ToolSummary {
   const url = getString(input, "url") ?? "";
-  return { label: "Browse", detail: url };
+  const prompt = getString(input, "prompt");
+  const detail = prompt ? `${url} — ${prompt}` : url;
+  return { label: "Browse", detail };
 }
 
 // ── Tool definition ────────────────────────────────────────────────
