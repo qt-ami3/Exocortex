@@ -11,7 +11,7 @@
 
 import type { KeyEvent } from "./input";
 import type { RenderState, EditMessageItem } from "./state";
-import { EDIT_INDEX_INSTRUCTIONS, EDIT_INDEX_QUEUED } from "./state";
+import { EDIT_INDEX_INSTRUCTIONS, EDIT_INDEX_QUEUED, focusPrompt } from "./state";
 
 // ── Open modal ────────────────────────────────────────────────────
 
@@ -54,6 +54,7 @@ export function openEditMessageModal(state: RenderState): void {
       userMessageIndex: EDIT_INDEX_QUEUED,
       text: qm.text,
       isQueued: true,
+      images: qm.images,
     });
   }
 
@@ -123,9 +124,7 @@ export function confirmEditMessage(state: RenderState): EditConfirmResult {
   // Place text in prompt
   state.inputBuffer = item.text;
   state.cursorPos = item.text.length;
-  state.vim.mode = "insert";
-  state.panelFocus = "chat";
-  state.chatFocus = "prompt";
+  focusPrompt(state);
 
   // Restore image attachments so they're re-sent with the edited message
   if (item.images?.length) {
