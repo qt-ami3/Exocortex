@@ -24,6 +24,10 @@ import type { ImageAttachment } from "@exocortex/shared/messages";
  * Each marker's `afterIndex` indicates how many messages should precede it.
  *
  * Example: marker at afterIndex=6 goes between messages[5] and messages[6].
+ *
+ * Markers must be sorted by afterIndex (ascending). This holds naturally
+ * since they're appended chronologically and completed-round counts are
+ * monotonically non-decreasing.
  */
 function interleaveRetryMarkers(
   messages: StoredMessage[],

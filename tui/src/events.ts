@@ -7,7 +7,7 @@
 
 import type { RenderState } from "./state";
 import { isStreaming, clearPendingAI } from "./state";
-import { ensureCurrentBlock, createPendingAI, truncateToCompletedRounds } from "./messages";
+import { ensureCurrentBlock, createPendingAI, truncateToCompletedRounds, splitPendingAI } from "./messages";
 import type { AIMessage, SystemMessage, ImageAttachment } from "./messages";
 import { updateConversationList, updateConversation, syncSelectedIndex } from "./sidebar";
 import { theme } from "./theme";
@@ -309,25 +309,10 @@ export function handleEvent(
       // message appears inline at the correct position — same pattern as
       // user_message interleaving. history_updated rebuilds after completion.
       if (state.pendingAI) {
-        // Strip partial blocks from the failed streaming attempt, keeping
-        // only blocks from fully completed tool rounds.
         truncateToCompletedRounds(state.pendingAI);
-        // Commit completed-round blocks as a finalized AI message
-        if (state.pendingAI.blocks.length > 0) {
-          const finalized: AIMessage = {
-            role: "assistant",
-            blocks: [...state.pendingAI.blocks],
-            metadata: null,
-          };
-          state.messages.push(finalized);
-        }
-        // Fresh pendingAI for the retry's blocks
-        state.pendingAI = createPendingAI(
-          state.pendingAI.metadata!.startedAt,
-          state.pendingAI.metadata!.model,
-        );
+        const finalized = splitPendingAI(state.pendingAI);
+        if (finalized) state.messages.push(finalized);
       }
-      // Push retry message after the committed blocks (correct visual position)
       state.messages.push({
         role: "system",
         text: `⟳ ${event.errorMessage} — retrying in ${event.delaySec}s (${event.attempt}/${event.maxAttempts})…`,
@@ -344,17 +329,9 @@ export function handleEvent(
       // inline between tool rounds (after completed blocks, before new ones).
       // This is purely for visual correctness during streaming — after
       // completion, history_updated rebuilds from canonical daemon state.
-      if (state.pendingAI && state.pendingAI.blocks.length > 0) {
-        const finalized: AIMessage = {
-          role: "assistant",
-          blocks: [...state.pendingAI.blocks],
-          metadata: null,
-        };
-        state.messages.push(finalized);
-        state.pendingAI = createPendingAI(
-          state.pendingAI.metadata!.startedAt,
-          state.pendingAI.metadata!.model,
-        );
+      if (state.pendingAI) {
+        const finalized = splitPendingAI(state.pendingAI);
+        if (finalized) state.messages.push(finalized);
       }
 
       state.messages.push({ role: "user", text: event.text, images: event.images, metadata: null });
