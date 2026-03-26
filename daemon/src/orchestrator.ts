@@ -26,6 +26,20 @@ export interface OrchestrationCallbacks {
   onComplete(): void;
 }
 
+// ── Helpers ───────────────────────────────────────────────────────
+
+/** Build API-ready user content — structured array when images are present, plain string otherwise. */
+function buildUserContent(text: string, images?: ImageAttachment[]): string | ApiContentBlock[] {
+  if (!images?.length) return text;
+  return [
+    ...images.map((img): ApiContentBlock => ({
+      type: "image",
+      source: { type: "base64", media_type: img.mediaType, data: img.base64 },
+    })),
+    ...(text ? [{ type: "text" as const, text }] : []),
+  ];
+}
+
 // ── Orchestrate a send_message ─────────────────────────────────────
 
 export async function orchestrateSendMessage(
@@ -54,17 +68,7 @@ export async function orchestrateSendMessage(
     return;
   }
 
-  // Build user message content — structured array when images are present
-  const userContent: string | ApiContentBlock[] = images?.length
-    ? [
-        ...images.map((img): ApiContentBlock => ({
-          type: "image",
-          source: { type: "base64", media_type: img.mediaType, data: img.base64 },
-        })),
-        ...(text ? [{ type: "text" as const, text }] : []),
-      ]
-    : text;
-  conv.messages.push({ role: "user", content: userContent, metadata: null });
+  conv.messages.push({ role: "user", content: buildUserContent(text, images), metadata: null });
   conv.updatedAt = Date.now();
   convStore.bumpToTop(convId);
 
@@ -243,17 +247,7 @@ export async function orchestrateSendMessage(
         // Don't push to conv.messages — the agent loop includes injected
         // messages in newMessages, which get pushed on the success/abort path.
         server.sendToSubscribers(convId, { type: "user_message", convId, text: qm.text, images: qm.images });
-        // Build API content — structured array when images are present
-        const content: string | import("./messages").ApiContentBlock[] = qm.images?.length
-          ? [
-              ...qm.images.map((img): import("./messages").ApiContentBlock => ({
-                type: "image",
-                source: { type: "base64", media_type: img.mediaType, data: img.base64 },
-              })),
-              ...(qm.text ? [{ type: "text" as const, text: qm.text }] : []),
-            ]
-          : qm.text;
-        apiMsgs.push({ role: "user", content });
+        apiMsgs.push({ role: "user", content: buildUserContent(qm.text, qm.images) });
         log("info", `orchestrator: injected next-turn message: "${qm.text.slice(0, 50)}"`);
       }
       return apiMsgs;

@@ -98,7 +98,7 @@ export function confirmQueueMessage(state: RenderState): ConfirmResult {
 
   // Queue the message — local shadow for display
   const images = qp.images;
-  const queued: QueuedMessage = { convId, text: qp.text, timing, ...(images?.length ? { images } : {}) };
+  const queued: QueuedMessage = { convId, text: qp.text, timing, images };
   state.queuedMessages.push(queued);
   state.queuePrompt = null;
   state.inputBuffer = "";

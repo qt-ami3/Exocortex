@@ -170,7 +170,7 @@ export function pushQueuedMessage(convId: string, text: string, timing: QueueTim
     queue = [];
     messageQueues.set(convId, queue);
   }
-  queue.push({ text, timing, ...(images?.length ? { images } : {}) });
+  queue.push({ text, timing, images });
 }
 
 /**
