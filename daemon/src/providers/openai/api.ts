@@ -1,5 +1,6 @@
 import { log } from "../../log";
 import type { ApiMessage, ApiContentBlock, ModelId, EffortLevel } from "../../messages";
+import { createAbortError, isAbortLikeError } from "../../abort";
 import { getVerifiedSession, AuthError } from "./auth";
 import { OPENAI_CODEX_RESPONSES_URL, OPENAI_ORIGINATOR } from "./constants";
 import type { ApiToolCall, ContentBlock, StreamCallbacks, StreamOptions, StreamResult } from "../types";
@@ -39,12 +40,31 @@ function retryBackoff(
   attempt: number,
   errMsg: string,
   callbacks: StreamCallbacks,
+  signal?: AbortSignal,
 ): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(createAbortError());
+  }
+
   const delay = Math.min(1000 * Math.pow(2, attempt), 30000) + Math.random() * 1000;
   const delaySec = Math.round(delay / 1000);
   log("warn", `openai api: ${errMsg}, retry ${attempt + 1}/${MAX_RETRIES} in ${delaySec}s`);
   callbacks.onRetry?.(attempt + 1, MAX_RETRIES, errMsg, delaySec);
-  return new Promise((resolve) => setTimeout(resolve, delay));
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, delay);
+
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      reject(createAbortError());
+    };
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 function mapEffort(effort: EffortLevel | undefined): string {
@@ -521,30 +541,46 @@ async function readStream(res: Response, cb: StreamCallbacks): Promise<StreamRes
   };
 }
 
-export async function streamMessage(
+/**
+ * Core OpenAI transport loop once auth has already been resolved.
+ *
+ * Kept separate from streamMessage() so tests can exercise retry/abort
+ * behavior without depending on auth state.
+ */
+export async function streamMessageWithSession(
+  session: { accessToken: string; accountId: string | null },
   messages: ApiMessage[],
   model: ModelId,
   callbacks: StreamCallbacks,
   options: StreamOptions = {},
 ): Promise<StreamResult> {
-  const { maxTokens = 32000 } = options;
-  const session = await getVerifiedSession();
+  const { maxTokens = 32000, signal } = options;
   let retryAttempt = 0;
 
   while (true) {
-    const res = await fetch(OPENAI_CODEX_RESPONSES_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-        Accept: "text/event-stream",
-        "Content-Type": "application/json",
-        originator: OPENAI_ORIGINATOR,
-        "User-Agent": "exocortexd/openai",
-        ...(session.accountId ? { "ChatGPT-Account-ID": session.accountId } : {}),
-      },
-      body: JSON.stringify(buildRequestBodyForTest(messages, model, maxTokens, options)),
-      signal: options.signal,
-    });
+    let res: Response;
+    try {
+      res = await fetch(OPENAI_CODEX_RESPONSES_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+          Accept: "text/event-stream",
+          "Content-Type": "application/json",
+          originator: OPENAI_ORIGINATOR,
+          "User-Agent": "exocortexd/openai",
+          ...(session.accountId ? { "ChatGPT-Account-ID": session.accountId } : {}),
+        },
+        body: JSON.stringify(buildRequestBodyForTest(messages, model, maxTokens, options)),
+        signal,
+      });
+    } catch (err) {
+      if (signal?.aborted || isAbortLikeError(err)) throw err;
+      if (retryAttempt < MAX_RETRIES) {
+        await retryBackoff(retryAttempt++, err instanceof Error ? err.message : String(err), callbacks, signal);
+        continue;
+      }
+      throw err;
+    }
 
     if (res.status === 401) {
       throw new AuthError("OpenAI authentication failed. Re-run `bun run src/main.ts login openai`.");
@@ -552,7 +588,7 @@ export async function streamMessage(
 
     if (res.status === 429 || res.status === 500 || res.status === 502 || res.status === 503 || res.status === 504) {
       if (retryAttempt < MAX_RETRIES) {
-        await retryBackoff(retryAttempt++, `HTTP ${res.status}`, callbacks);
+        await retryBackoff(retryAttempt++, `HTTP ${res.status}`, callbacks, signal);
         continue;
       }
       const text = await res.text();
@@ -568,11 +604,22 @@ export async function streamMessage(
     try {
       return await readStream(res, callbacks);
     } catch (err) {
+      if (signal?.aborted || isAbortLikeError(err)) throw err;
       if (retryAttempt < MAX_RETRIES) {
-        await retryBackoff(retryAttempt++, err instanceof Error ? err.message : String(err), callbacks);
+        await retryBackoff(retryAttempt++, err instanceof Error ? err.message : String(err), callbacks, signal);
         continue;
       }
       throw err;
     }
   }
+}
+
+export async function streamMessage(
+  messages: ApiMessage[],
+  model: ModelId,
+  callbacks: StreamCallbacks,
+  options: StreamOptions = {},
+): Promise<StreamResult> {
+  const session = await getVerifiedSession();
+  return streamMessageWithSession(session, messages, model, callbacks, options);
 }
