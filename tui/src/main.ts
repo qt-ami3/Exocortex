@@ -173,6 +173,15 @@ function sendDirectly(messageText: string, images?: ImageAttachment[]): void {
     daemon.createConversation(state.provider, state.model, PENDING_TITLE, state.effort);
   } else {
     daemon.sendMessage(state.convId, messageText, startedAt, images);
+
+    // Instructions can create an otherwise-empty conversation before the first
+    // real user message. In that case, kick off the normal pending→generated
+    // title flow when the first user message is sent.
+    const conv = state.sidebar.conversations.find((candidate) => candidate.id === state.convId);
+    if (conv && !conv.title.trim()) {
+      conv.title = PENDING_TITLE;
+      generateTitle(state.convId, state, daemon, scheduleRender);
+    }
   }
 
   scheduleRender();
