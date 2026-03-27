@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { ApiMessage } from "../../messages";
-import { buildOpenAIInputForTest, buildRequestBodyForTest } from "./api";
+import { buildOpenAIInputForTest, buildRequestBodyForTest, mergeReasoningSummariesForTest, readOpenAIEventsForTest } from "./api";
 
 describe("OpenAI replay input", () => {
   test("does not reuse response ids as assistant item ids", () => {
@@ -38,5 +38,146 @@ describe("OpenAI replay input", () => {
     ], "gpt-5.4", 1234, {});
 
     expect(body.max_output_tokens).toBeUndefined();
+  });
+});
+
+describe("OpenAI reasoning summaries", () => {
+  test("merges completed summaries over partial streamed summaries", () => {
+    expect(mergeReasoningSummariesForTest(
+      ["first section"],
+      ["first section", "second section", "third section"],
+    )).toEqual(["first section", "second section", "third section"]);
+  });
+
+  test("prefers completed summary text for overlapping sections", () => {
+    expect(mergeReasoningSummariesForTest(
+      ["partial first", "partial second"],
+      ["final first", "final second"],
+    )).toEqual(["final first", "final second"]);
+  });
+
+  test("streams reasoning summaries into thinking blocks and backfills missing final sections", () => {
+    const blockStarts: Array<"text" | "thinking"> = [];
+    const thinkingChunks: string[] = [];
+    const result = readOpenAIEventsForTest([
+      {
+        type: "response.created",
+        response: { id: "resp_1" },
+      },
+      {
+        type: "response.output_item.added",
+        output_index: 0,
+        item: { type: "reasoning", id: "rs_1" },
+      },
+      {
+        type: "response.reasoning_summary_part.added",
+        output_index: 0,
+        summary_index: 0,
+      },
+      {
+        type: "response.reasoning_summary_text.delta",
+        output_index: 0,
+        summary_index: 0,
+        delta: "first section",
+      },
+      {
+        type: "response.completed",
+        response: {
+          id: "resp_1",
+          usage: { input_tokens: 11, output_tokens: 7 },
+          output: [
+            {
+              type: "reasoning",
+              id: "rs_1",
+              encrypted_content: "opaque",
+              summary: [
+                { type: "summary_text", text: "first section" },
+                { type: "summary_text", text: "second section" },
+              ],
+            },
+          ],
+        },
+      },
+    ], {
+      onBlockStart(type) { blockStarts.push(type); },
+      onThinking(chunk) { thinkingChunks.push(chunk); },
+    });
+
+    expect(blockStarts).toEqual(["thinking"]);
+    expect(thinkingChunks).toEqual(["first section"]);
+    expect(result.thinking).toBe("first sectionsecond section");
+    expect(result.blocks).toEqual([
+      { type: "thinking", text: "first section", signature: "" },
+      { type: "thinking", text: "second section", signature: "" },
+    ]);
+    expect(result.assistantProviderData).toEqual({
+      openai: {
+        responseId: "resp_1",
+        reasoningItems: [
+          {
+            id: "rs_1",
+            encryptedContent: "opaque",
+            summaries: ["first section", "second section"],
+          },
+        ],
+      },
+    });
+  });
+
+  test("starts a new thinking block when a new reasoning summary part begins", () => {
+    const blockStarts: Array<"text" | "thinking"> = [];
+    const result = readOpenAIEventsForTest([
+      {
+        type: "response.output_item.added",
+        output_index: 0,
+        item: { type: "reasoning", id: "rs_1" },
+      },
+      {
+        type: "response.reasoning_summary_part.added",
+        output_index: 0,
+        summary_index: 0,
+      },
+      {
+        type: "response.reasoning_summary_text.delta",
+        output_index: 0,
+        summary_index: 0,
+        delta: "first",
+      },
+      {
+        type: "response.reasoning_summary_part.added",
+        output_index: 0,
+        summary_index: 1,
+      },
+      {
+        type: "response.reasoning_summary_text.delta",
+        output_index: 0,
+        summary_index: 1,
+        delta: "second",
+      },
+      {
+        type: "response.completed",
+        response: {
+          id: "resp_1",
+          output: [
+            {
+              type: "reasoning",
+              id: "rs_1",
+              summary: [
+                { type: "summary_text", text: "first" },
+                { type: "summary_text", text: "second" },
+              ],
+            },
+          ],
+        },
+      },
+    ], {
+      onBlockStart(type) { blockStarts.push(type); },
+    });
+
+    expect(blockStarts).toEqual(["thinking", "thinking"]);
+    expect(result.blocks).toEqual([
+      { type: "thinking", text: "first", signature: "" },
+      { type: "thinking", text: "second", signature: "" },
+    ]);
   });
 });
