@@ -28,6 +28,7 @@ export type CommandResult =
   | { type: "handled" }
   | { type: "quit" }
   | { type: "new_conversation" }
+  | { type: "create_conversation_for_instructions"; text: string }
   | { type: "model_changed"; model: ModelId }
   | { type: "effort_changed"; effort: EffortLevel }
   | { type: "rename_conversation"; title: string }
@@ -46,6 +47,12 @@ export interface SlashCommand {
 }
 
 // ── Command definitions ─────────────────────────────────────────────
+
+function showNoSystemInstructions(state: RenderState): CommandResult {
+  state.messages.push({ role: "system", text: "No system instructions set for this conversation.", metadata: null });
+  clearPrompt(state);
+  return { type: "handled" };
+}
 
 function availableProviders(state: RenderState): ProviderId[] {
   const ids = state.providerRegistry.map((p) => p.id);
@@ -366,34 +373,27 @@ const commands: SlashCommand[] = [
       const trimmed = arg.trimStart();
       if (!trimmed) {
         if (!state.convId) {
-          state.messages.push({ role: "system", text: "No system instructions set for this conversation.", metadata: null });
-          clearPrompt(state);
-          return { type: "handled" };
+          return showNoSystemInstructions(state);
         }
         // Show current instructions
         const instrMsg = state.messages.find((m): m is import("./messages").SystemInstructionsMessage => m.role === "system_instructions");
         if (instrMsg?.text.trim()) {
           state.messages.push({ role: "system", text: `Current instructions:\n${instrMsg.text}`, metadata: null });
-        } else {
-          state.messages.push({ role: "system", text: "No system instructions set for this conversation.", metadata: null });
+          clearPrompt(state);
+          return { type: "handled" };
         }
-        clearPrompt(state);
-        return { type: "handled" };
+        return showNoSystemInstructions(state);
       }
       if (trimmed === "clear") {
         if (!state.convId) {
-          state.messages.push({ role: "system", text: "No system instructions set for this conversation.", metadata: null });
-          clearPrompt(state);
-          return { type: "handled" };
+          return showNoSystemInstructions(state);
         }
         clearPrompt(state);
         return { type: "set_system_instructions", text: "" };
       }
       if (!state.convId) {
-        state.pendingSystemInstructions = trimmed;
-        state.pendingGenerateTitleOnCreate = false;
         clearPrompt(state);
-        return { type: "new_conversation" };
+        return { type: "create_conversation_for_instructions", text: trimmed };
       }
       clearPrompt(state);
       return { type: "set_system_instructions", text: trimmed };

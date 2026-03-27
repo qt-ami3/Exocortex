@@ -96,10 +96,13 @@ function handleSubmit(): void {
         case "new_conversation":
           if (state.convId) daemon.unsubscribe(state.convId);
           state.convId = null;
-          if (state.pendingSystemInstructions !== null) {
-            const initialTitle = state.pendingGenerateTitleOnCreate ? PENDING_TITLE : "";
-            daemon.createConversation(state.provider, state.model, initialTitle, state.effort);
-          }
+          break;
+        case "create_conversation_for_instructions":
+          if (state.convId) daemon.unsubscribe(state.convId);
+          state.convId = null;
+          state.pendingSystemInstructions = cmdResult.text;
+          state.pendingGenerateTitleOnCreate = false;
+          daemon.createConversation(state.provider, state.model, "", state.effort);
           break;
         case "model_changed":
           if (state.convId) daemon.setModel(state.convId, cmdResult.model);

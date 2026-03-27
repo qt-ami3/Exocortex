@@ -7,13 +7,13 @@ import { tryCommand } from "./commands";
 import { createInitialState } from "./state";
 
 describe("/instructions", () => {
-  test("on a new chat with text, stages instructions and requests conversation creation", () => {
+  test("on a new chat with text, requests conversation creation for instructions", () => {
     const state = createInitialState();
 
     const result = tryCommand("/instructions be concise", state);
 
-    expect(result).toEqual({ type: "new_conversation" });
-    expect(state.pendingSystemInstructions).toBe("be concise");
+    expect(result).toEqual({ type: "create_conversation_for_instructions", text: "be concise" });
+    expect(state.pendingSystemInstructions).toBeNull();
     expect(state.pendingGenerateTitleOnCreate).toBe(false);
     expect(state.messages).toHaveLength(0);
   });

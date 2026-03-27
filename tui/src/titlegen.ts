@@ -54,6 +54,28 @@ function extractUserContext(state: RenderState): string {
   return parts.join("\n\n");
 }
 
+// ── Title state helpers ────────────────────────────────────────────
+
+function pendingTitleFor(existingTitle: string): { pendingTitle: string; previousStableTitle: string } {
+  const markPrefix = getMarkPrefix(existingTitle);
+  const pendingTitle = markPrefix ? `${markPrefix} ${PENDING_TITLE}` : PENDING_TITLE;
+  const previousStableTitle = existingTitle === pendingTitle ? (markPrefix ?? "") : existingTitle;
+  return { pendingTitle, previousStableTitle };
+}
+
+function setCanonicalTitle(
+  convId: string,
+  title: string,
+  state: RenderState,
+  daemon: DaemonClient,
+  scheduleRender: () => void,
+): void {
+  const conv = state.sidebar.conversations.find((candidate) => candidate.id === convId);
+  if (conv) conv.title = title;
+  daemon.renameConversation(convId, title);
+  scheduleRender();
+}
+
 // ── Public API ─────────────────────────────────────────────────────
 
 export function generateTitle(
@@ -65,18 +87,14 @@ export function generateTitle(
   const context = extractUserContext(state);
   const prompt = `${INSTRUCTION}\n\nHere is the conversation to generate a title for:\n<prompt>\n${context}\n</prompt>`;
 
-  // Preserve any emoji mark prefix across title regeneration
-  const conv = state.sidebar.conversations.find(c => c.id === convId);
-  const existingTitle = conv?.title ?? "";
+  // Preserve any emoji mark prefix across title regeneration.
+  const existingTitle = state.sidebar.conversations.find(c => c.id === convId)?.title ?? "";
   const markPrefix = getMarkPrefix(existingTitle);
-  const pendingTitle = markPrefix ? `${markPrefix} ${PENDING_TITLE}` : PENDING_TITLE;
-  const previousStableTitle = existingTitle === pendingTitle ? (markPrefix ?? "") : existingTitle;
+  const { pendingTitle, previousStableTitle } = pendingTitleFor(existingTitle);
 
   // Make the pending title canonical immediately so daemon-driven sidebar
   // updates don't clobber the optimistic local state while generation runs.
-  if (conv) conv.title = pendingTitle;
-  daemon.renameConversation(convId, pendingTitle);
-  scheduleRender();
+  setCanonicalTitle(convId, pendingTitle, state, daemon, scheduleRender);
 
   daemon.llmComplete(
     "",
@@ -84,19 +102,13 @@ export function generateTitle(
     (generatedTitle) => {
       let title = generatedTitle.trim().toLowerCase().replace(/["""''`.]/g, "");
       if (markPrefix) title = markPrefix + " " + title;
-      daemon.renameConversation(convId, title);
-      const conv = state.sidebar.conversations.find(c => c.id === convId);
-      if (conv) conv.title = title;
-      scheduleRender();
+      setCanonicalTitle(convId, title, state, daemon, scheduleRender);
     },
     (error) => {
       // Revert from pending to the last stable title (or empty for a brand-new
       // conversation) so the UI doesn't get stuck showing a perpetual pending state.
-      daemon.renameConversation(convId, previousStableTitle);
-      const conv = state.sidebar.conversations.find(c => c.id === convId);
-      if (conv) conv.title = previousStableTitle;
+      setCanonicalTitle(convId, previousStableTitle, state, daemon, scheduleRender);
       state.messages.push({ role: "system", text: `✗ Title generation failed: ${error}`, metadata: null });
-      scheduleRender();
     },
     state.provider,
     titleModelForProvider(state.provider),
