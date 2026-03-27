@@ -8,8 +8,8 @@
  * Commands flow client → daemon. Events flow daemon → client.
  */
 
-import type { ModelId, EffortLevel, Block, MessageMetadata, UsageData, ConversationSummary, ToolDisplayInfo, ExternalToolStyle, ImageAttachment } from "./messages";
-export type { ModelId, EffortLevel, Block, MessageMetadata, UsageData, ConversationSummary, ToolDisplayInfo, ExternalToolStyle, ImageAttachment };
+import type { ProviderId, ProviderInfo, ModelId, EffortLevel, Block, MessageMetadata, UsageData, ConversationSummary, ToolDisplayInfo, ExternalToolStyle, ImageAttachment } from "./messages";
+export type { ProviderId, ProviderInfo, ModelId, EffortLevel, Block, MessageMetadata, UsageData, ConversationSummary, ToolDisplayInfo, ExternalToolStyle, ImageAttachment };
 
 // ── Commands (client → daemon) ──────────────────────────────────────
 
@@ -21,6 +21,7 @@ export interface PingCommand {
 export interface NewConversationCommand {
   type: "new_conversation";
   reqId?: string;
+  provider?: ProviderId;
   model?: ModelId;
   effort?: EffortLevel;
   /** Initial title. Clients that don't set this get an empty title. */
@@ -165,7 +166,8 @@ export interface LlmCompleteCommand {
   reqId?: string;
   system: string;
   userText: string;
-  /** Model to use. Defaults to "haiku". */
+  provider?: ProviderId;
+  /** Model to use. Defaults to the provider's default model. */
   model?: ModelId;
   /** Max output tokens. Defaults to 16000 (must exceed thinking budget for non-adaptive models). */
   maxTokens?: number;
@@ -181,11 +183,13 @@ export interface GetSystemPromptCommand {
 export interface LoginCommand {
   type: "login";
   reqId?: string;
+  provider?: ProviderId;
 }
 
 export interface LogoutCommand {
   type: "logout";
   reqId?: string;
+  provider?: ProviderId;
 }
 
 export type Command =
@@ -232,12 +236,14 @@ export interface ConversationCreatedEvent {
   type: "conversation_created";
   reqId?: string;
   convId: string;
+  provider: ProviderId;
   model: ModelId;
 }
 
 export interface StreamingStartedEvent {
   type: "streaming_started";
   convId: string;
+  provider: ProviderId;
   model: ModelId;
   /** When the AI started processing. Lets late-joining clients show the correct elapsed time. */
   startedAt: number;
@@ -312,7 +318,8 @@ export interface MessageCompleteEvent {
 
 export interface UsageUpdateEvent {
   type: "usage_update";
-  usage: UsageData;
+  provider: ProviderId;
+  usage: UsageData | null;
 }
 
 export interface ConversationsListEvent {
@@ -342,6 +349,7 @@ export interface ConversationLoadedEvent {
   type: "conversation_loaded";
   reqId?: string;
   convId: string;
+  provider: ProviderId;
   model: ModelId;
   effort: EffortLevel;
   /** All messages in display order. */
@@ -410,6 +418,7 @@ export interface SystemMessageEvent {
 
 export interface ToolsAvailableEvent {
   type: "tools_available";
+  providers: ProviderInfo[];
   tools: ToolDisplayInfo[];
   externalToolStyles?: ExternalToolStyle[];
 }

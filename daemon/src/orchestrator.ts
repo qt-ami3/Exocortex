@@ -8,7 +8,7 @@
  */
 
 import { log } from "./log";
-import { loadAuth } from "./store";
+import { hasConfiguredCredentials } from "./auth";
 import { runAgentLoop, type AgentCallbacks, type AgentState } from "./agent";
 import { buildSystemPrompt } from "./system";
 import { getToolDefs, buildExecutor, summarizeTool, type ContextToolEnv } from "./tools/registry";
@@ -86,15 +86,18 @@ export async function orchestrateSendMessage(
   ext: OrchestrationCallbacks,
   images?: ImageAttachment[],
 ): Promise<void> {
-  const auth = loadAuth();
-  if (!auth?.tokens?.accessToken) {
-    if (client) server.sendTo(client, { type: "error", reqId, convId, message: "Not authenticated. Run: bun run login (in daemon/)" });
-    return;
-  }
-
   const conv = convStore.get(convId);
   if (!conv) {
     if (client) server.sendTo(client, { type: "error", reqId, convId, message: `Conversation ${convId} not found` });
+    return;
+  }
+  if (!hasConfiguredCredentials(conv.provider)) {
+    if (client) server.sendTo(client, {
+      type: "error",
+      reqId,
+      convId,
+      message: `Not authenticated for provider ${conv.provider}. Run: bun run src/main.ts login ${conv.provider}`,
+    });
     return;
   }
   if (convStore.isStreaming(convId)) {
@@ -121,7 +124,7 @@ export async function orchestrateSendMessage(
 
   // Broadcast sidebar update (streaming indicator)
   server.broadcast({ type: "conversation_updated", summary: convStore.getSummary(convId)! });
-  server.sendToSubscribers(convId, { type: "streaming_started", convId, model: conv.model, startedAt });
+  server.sendToSubscribers(convId, { type: "streaming_started", convId, provider: conv.provider, model: conv.model, startedAt });
 
   // Extract per-conversation system instructions (if present)
   const systemInstructionsText = convStore.getSystemInstructions(convId);
@@ -132,6 +135,7 @@ export async function orchestrateSendMessage(
     .map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
+      providerData: m.providerData,
     }));
 
   // ── Context tool support ──────────────────────────────────────────
@@ -302,7 +306,7 @@ export async function orchestrateSendMessage(
       // Rebuild from conv.messages (now trimmed) — the source of truth for historical state
       const rebuilt = conv.messages
         .filter(m => m.role !== "system" && m.role !== "system_instructions")
-        .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+        .map(m => ({ role: m.role as "user" | "assistant", content: m.content, providerData: m.providerData }));
       // Persist immediately
       convStore.markDirty(convId);
       convStore.flush(convId);
@@ -320,23 +324,22 @@ export async function orchestrateSendMessage(
     },
   };
 
-  // Wrap the raw executor to keep the watchdog happy during long tool
-  // executions. Without this, the stale-stream watchdog aborts the
-  // AbortController after STALE_STREAM_TIMEOUT of inactivity — but
-  // tool execution (e.g. bash with await=600) produces no SSE events,
-  // so touchActivity never fires and the watchdog false-triggers.
+  // Pause staleness tracking during tool execution. Tools can run for
+  // hours (e.g. kernel builds, long test suites) — the watchdog has no
+  // business timing them out. When tools finish, resume tracking so the
+  // watchdog catches a hung model on the *next* API streaming call.
   const rawExecutor = buildExecutor(contextEnv);
   const executor: typeof rawExecutor = async (calls, signal?) => {
-    const keepalive = setInterval(() => convStore.touchActivity(convId), 60_000);
+    convStore.pauseActivity(convId);
     try {
       return await rawExecutor(calls, signal);
     } finally {
-      clearInterval(keepalive);
+      convStore.resumeActivity(convId);
     }
   };
 
   try {
-    const result = await runAgentLoop(apiMessages, conv.model, callbacks, {
+    const result = await runAgentLoop(apiMessages, conv.provider, conv.model, callbacks, {
       system: buildSystemPrompt(systemInstructionsText ?? undefined),
       signal: ac.signal,
       tools: getToolDefs(),
@@ -356,6 +359,7 @@ export async function orchestrateSendMessage(
       role: m.role,
       content: m.content,
       metadata: null,
+      providerData: m.providerData,
     }));
     const lastAssistant = [...storedMessages].reverse().find(m => m.role === "assistant");
     if (lastAssistant) {
@@ -417,6 +421,7 @@ export async function orchestrateSendMessage(
       role: m.role,
       content: m.content,
       metadata: null,
+      providerData: m.providerData,
     }));
     if (completedStored.length > 0) {
       // Stamp metadata on the last completed assistant — mirrors the success path.
@@ -468,6 +473,7 @@ export async function orchestrateSendMessage(
           model: conv.model,
           tokens: agentState.tokens,
         },
+        providerData: undefined,
       });
     }
 

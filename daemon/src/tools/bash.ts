@@ -16,7 +16,7 @@ import { writeFileSync, createWriteStream, type WriteStream } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import type { Tool, ToolResult, ToolSummary } from "./types";
-import { MAX_OUTPUT_CHARS, getString, getNumber, safeSlice } from "./util";
+import { MAX_OUTPUT_CHARS, getString, getNumber, safeSlice, summarizeParams } from "./util";
 import { TOOL_BACKGROUND_SECONDS } from "../constants";
 import { isWindows } from "@exocortex/shared/paths";
 
@@ -314,7 +314,7 @@ async function executeBashImpl(
 
 function summarize(input: Record<string, unknown>): ToolSummary {
   const command = getString(input, "command") ?? "";
-  return { label: "$", detail: command };
+  return { label: "$", detail: summarizeParams(command, input, ["command"]) };
 }
 
 // ── Tool definition ────────────────────────────────────────────────

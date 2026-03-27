@@ -7,7 +7,7 @@
  */
 
 import type { Tool, ToolResult, ToolSummary } from "./types";
-import { getString, getBoolean } from "./util";
+import { getString, getBoolean, summarizeParams } from "./util";
 import { isWindows } from "@exocortex/shared/paths";
 import { log } from "../log";
 
@@ -116,7 +116,7 @@ async function executeEdit(input: Record<string, unknown>): Promise<ToolResult> 
 
 function summarize(input: Record<string, unknown>): ToolSummary {
   const filePath = getString(input, "file_path") ?? "";
-  return { label: "Edit", detail: filePath };
+  return { label: "Edit", detail: summarizeParams(filePath, input, ["file_path", "old_string", "new_string"]) };
 }
 
 // ── Tool definition ────────────────────────────────────────────────

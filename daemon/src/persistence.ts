@@ -13,12 +13,12 @@ import { join } from "path";
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, renameSync } from "fs";
 import { log } from "./log";
 import { conversationsDir, trashDir } from "@exocortex/shared/paths";
-import type { Conversation, StoredMessage, ApiMessage, ModelId, EffortLevel, ConversationSummary } from "./messages";
+import type { Conversation, StoredMessage, ApiMessage, ProviderId, ModelId, EffortLevel, ConversationSummary } from "./messages";
 import { DEFAULT_EFFORT, sortConversations } from "./messages";
 
 // ── Schema version ──────────────────────────────────────────────────
 
-const CURRENT_VERSION = 10;
+const CURRENT_VERSION = 11;
 
 interface ConversationFileV1 {
   version: 1;
@@ -131,6 +131,11 @@ interface ConversationFileV9 {
 interface ConversationFileV10 {
   version: 10;
   id: string;
+  /**
+   * Optional for compatibility: feat-system-instructions also used v10
+   * before provider was introduced.
+   */
+  provider?: ProviderId;
   model: ModelId;
   effort: EffortLevel;
   messages: StoredMessage[];
@@ -143,7 +148,23 @@ interface ConversationFileV10 {
   title: string;
 }
 
-type ConversationFile = ConversationFileV10;
+interface ConversationFileV11 {
+  version: 11;
+  id: string;
+  provider: ProviderId;
+  model: ModelId;
+  effort: EffortLevel;
+  messages: StoredMessage[];
+  createdAt: number;
+  updatedAt: number;
+  lastContextTokens: number | null;
+  marked: boolean;
+  pinned: boolean;
+  sortOrder: number;
+  title: string;
+}
+
+type ConversationFile = ConversationFileV11;
 
 // ── Migrations ──────────────────────────────────────────────────────
 
@@ -237,11 +258,25 @@ function migrateV8toV9(data: ConversationFileV8): ConversationFileV9 {
   };
 }
 
-/** v9 → v10: Support system_instructions message role (no-op — just bump version). */
+/**
+ * v9 → v10: Support system_instructions message role.
+ *
+ * No structural change — feat-system-instructions originally used v10 for
+ * this semantic expansion before provider was added in a later schema bump.
+ */
 function migrateV9toV10(data: ConversationFileV9): ConversationFileV10 {
   return {
     ...data,
     version: 10,
+  };
+}
+
+/** v10 → v11: Add provider field (default existing conversations to anthropic). */
+function migrateV10toV11(data: ConversationFileV10): ConversationFileV11 {
+  return {
+    ...data,
+    version: 11,
+    provider: data.provider ?? "anthropic",
   };
 }
 
@@ -260,6 +295,7 @@ function migrate(raw: Record<string, unknown>): ConversationFile {
   if (data.version < 8) data = migrateV7toV8(data);
   if (data.version < 9) data = migrateV8toV9(data);
   if (data.version < 10) data = migrateV9toV10(data);
+  if (data.version < 11) data = migrateV10toV11(data);
 
   if (data.version !== CURRENT_VERSION) {
     log("warn", `persistence: unknown schema version ${data.version}, attempting to load as v${CURRENT_VERSION}`);
@@ -324,6 +360,7 @@ function toFile(conv: Conversation): ConversationFile {
   return {
     version: CURRENT_VERSION,
     id: conv.id,
+    provider: conv.provider,
     model: conv.model,
     effort: conv.effort ?? DEFAULT_EFFORT,
     messages: conv.messages,
@@ -340,6 +377,7 @@ function toFile(conv: Conversation): ConversationFile {
 function fromFile(file: ConversationFile): Conversation {
   return {
     id: file.id,
+    provider: file.provider,
     model: file.model,
     effort: file.effort,
     messages: file.messages,
@@ -443,6 +481,7 @@ export function loadAll(): ConversationSummary[] {
       const file = migrate(raw);
       summaries.push({
         id: file.id,
+        provider: file.provider,
         model: file.model,
         effort: file.effort,
         createdAt: file.createdAt,

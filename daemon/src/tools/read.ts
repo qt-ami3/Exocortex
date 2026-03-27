@@ -7,7 +7,7 @@
  */
 
 import type { Tool, ToolResult, ToolSummary } from "./types";
-import { cap, getString, getNumber, safeSlice } from "./util";
+import { cap, getString, getNumber, safeSlice, summarizeParams } from "./util";
 import { log } from "../log";
 
 // ── Constants ──────────────────────────────────────────────────────
@@ -226,7 +226,7 @@ async function executeRead(input: Record<string, unknown>): Promise<ToolResult> 
 
 function summarize(input: Record<string, unknown>): ToolSummary {
   const filePath = getString(input, "file_path") ?? "";
-  return { label: "Read", detail: filePath };
+  return { label: "Read", detail: summarizeParams(filePath, input, ["file_path"]) };
 }
 
 // ── Tool definition ────────────────────────────────────────────────
