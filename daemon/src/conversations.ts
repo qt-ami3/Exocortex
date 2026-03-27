@@ -7,7 +7,7 @@
  */
 
 import type { Conversation, ProviderId, ModelId, EffortLevel, ConversationSummary, StoredMessage } from "./messages";
-import { DEFAULT_EFFORT, createConversation, sortConversations, isToolResultMessage, topUnpinnedOrder, bottomPinnedOrder } from "./messages";
+import { DEFAULT_EFFORT, createConversation, sortConversations, isToolResultMessage, countConversationMessages, topUnpinnedOrder, bottomPinnedOrder } from "./messages";
 import { buildDisplayData, type ConversationDisplayData } from "./display";
 import { summarizeTool } from "./tools/registry";
 import * as persistence from "./persistence";
@@ -157,18 +157,27 @@ export function setSystemInstructions(id: string, text: string): boolean {
   if (!conv) return false;
 
   const hasExisting = conv.messages.length > 0 && conv.messages[0].role === "system_instructions";
+  let changed = false;
 
   if (text === "") {
     // Clear: remove the system_instructions message if present
-    if (hasExisting) conv.messages.splice(0, 1);
+    if (hasExisting) {
+      conv.messages.splice(0, 1);
+      changed = true;
+    }
   } else if (hasExisting) {
     // Update existing
-    conv.messages[0].content = text;
+    if (conv.messages[0].content !== text) {
+      conv.messages[0].content = text;
+      changed = true;
+    }
   } else {
     // Insert new at the front
     conv.messages.unshift({ role: "system_instructions", content: text, metadata: null });
+    changed = true;
   }
 
+  if (changed) conv.updatedAt = Date.now();
   markDirty(id);
   flush(id);
   return true;
@@ -398,7 +407,7 @@ export function getSummary(id: string): ConversationSummary | null {
     effort: conv.effort ?? DEFAULT_EFFORT,
     createdAt: conv.createdAt,
     updatedAt: conv.updatedAt,
-    messageCount: conv.messages.length,
+    messageCount: countConversationMessages(conv.messages),
     title: conv.title,
     marked: conv.marked,
     pinned: conv.pinned,

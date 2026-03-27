@@ -74,6 +74,11 @@ export function isToolResultMessage(msg: StoredMessage): boolean {
   return msg.content.length > 0 && msg.content.some(b => b.type === "tool_result");
 }
 
+/** Count messages for summaries/UI, excluding per-conversation instructions metadata. */
+export function countConversationMessages(messages: StoredMessage[]): number {
+  return messages.filter((msg) => msg.role !== "system_instructions").length;
+}
+
 export function createConversation(id: string, provider: ProviderId, model: ModelId, sortOrder?: number, title?: string, effort?: EffortLevel): Conversation {
   const now = Date.now();
   return {

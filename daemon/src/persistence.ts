@@ -14,7 +14,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlink
 import { log } from "./log";
 import { conversationsDir, trashDir } from "@exocortex/shared/paths";
 import type { Conversation, StoredMessage, ApiMessage, ProviderId, ModelId, EffortLevel, ConversationSummary } from "./messages";
-import { DEFAULT_EFFORT, sortConversations } from "./messages";
+import { DEFAULT_EFFORT, countConversationMessages, sortConversations } from "./messages";
 
 // ── Schema version ──────────────────────────────────────────────────
 
@@ -486,7 +486,7 @@ export function loadAll(): ConversationSummary[] {
         effort: file.effort,
         createdAt: file.createdAt,
         updatedAt: file.updatedAt,
-        messageCount: file.messages.length,
+        messageCount: countConversationMessages(file.messages),
         title: file.title,
         marked: file.marked,
         pinned: file.pinned,

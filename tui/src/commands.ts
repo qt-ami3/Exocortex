@@ -135,7 +135,7 @@ function formatConvoInfo(state: RenderState): string | null {
   const title = conv ? convDisplayName(conv, "(untitled)") : "(untitled)";
   const provider = conv?.provider ?? state.provider;
   const model = conv?.model ?? state.model;
-  const msgs = conv?.messageCount ?? state.messages.filter(m => m.role !== "system").length;
+  const msgs = conv?.messageCount ?? state.messages.filter(m => m.role !== "system" && m.role !== "system_instructions").length;
   const created = conv ? new Date(conv.createdAt).toLocaleString() : "unknown";
   const updated = conv ? new Date(conv.updatedAt).toLocaleString() : "unknown";
   const markLabel = conv ? getMarkFromTitle(conv.title)?.label ?? null : null;
