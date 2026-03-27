@@ -36,6 +36,7 @@ export interface ProviderInfo {
   label: string;
   defaultModel: ModelId;
   allowsCustomModels: boolean;
+  supportsFastMode: boolean;
   models: ModelInfo[];
 }
 
@@ -173,6 +174,7 @@ export interface ConversationSummary {
   provider: ProviderId;
   model: ModelId;
   effort: EffortLevel;
+  fastMode: boolean;
   createdAt: number;
   updatedAt: number;
   messageCount: number;

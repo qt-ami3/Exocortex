@@ -12,6 +12,7 @@
 import { streamMessage, type ApiToolCall } from "./api";
 import { log } from "./log";
 import type { ProviderId, ModelId, EffortLevel, Block, ToolCallBlock, ToolResultBlock, ApiMessage, ApiContentBlock } from "./messages";
+import type { ServiceTier } from "./providers/types";
 import { MAX_OUTPUT_CHARS, cap } from "./tools/util";
 import { CONTEXT_TARGET } from "./constants";
 import { getMaxContext } from "./providers/registry";
@@ -147,6 +148,7 @@ export async function runAgentLoop(
     maxTokens?: number;
     tools?: unknown[];
     effort?: EffortLevel;
+    serviceTier?: ServiceTier;
     promptCacheKey?: string;
     /** Mutable state for abort recovery — caller reads on catch. */
     state?: AgentState;
@@ -188,6 +190,7 @@ export async function runAgentLoop(
       maxTokens: options.maxTokens,
       tools: options.tools,
       effort: options.effort,
+      serviceTier: options.serviceTier,
       promptCacheKey: options.promptCacheKey,
     });
 

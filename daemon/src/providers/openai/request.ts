@@ -33,6 +33,7 @@ interface OpenAIRequestShape {
     effort: string;
     summary: string;
   };
+  service_tier?: string;
   tools?: Array<{
     type: string;
     name: string;
@@ -205,8 +206,20 @@ function buildOpenAITools(tools: StreamOptions["tools"]): OpenAIRequestShape["to
   }));
 }
 
+function mapServiceTier(serviceTier: StreamOptions["serviceTier"]): string | undefined {
+  switch (serviceTier) {
+    // OpenAI's Codex backend expects the fast tier under the wire value
+    // `priority`, even though the app-level setting is exposed as `fast`.
+    case "fast":
+      return "priority";
+    default:
+      return undefined;
+  }
+}
+
 function buildRequestShape(model: ModelId, options: StreamOptions): OpenAIRequestShape {
   const tools = buildOpenAITools(options.tools);
+  const serviceTier = mapServiceTier(options.serviceTier);
   return {
     model,
     instructions: options.system || "You are a helpful assistant.",
@@ -217,6 +230,7 @@ function buildRequestShape(model: ModelId, options: StreamOptions): OpenAIReques
       effort: mapEffort(options.effort),
       summary: "concise",
     },
+    ...(serviceTier ? { service_tier: serviceTier } : {}),
     ...(tools ? { tools } : {}),
   };
 }
