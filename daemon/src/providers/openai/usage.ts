@@ -5,6 +5,17 @@ import { log } from "../../log";
 import type { UsageData, UsageWindow } from "../../messages";
 
 const USAGE_FILE = join(runtimeDir(), "usage-openai.json");
+const DEFAULT_LIMIT_PREFIX = "x-codex";
+
+const PRIMARY_PERCENT_HEADERS = [
+  "primary-used-percent",
+  "primary-over-secondary-limit-percent",
+] as const;
+
+const SECONDARY_PERCENT_HEADERS = [
+  "secondary-used-percent",
+  "secondary-over-primary-limit-percent",
+] as const;
 
 function loadFromDisk(): UsageData | null {
   try {
@@ -99,22 +110,43 @@ export function handleUsageHeaders(headers: Headers, onUpdate: (usage: UsageData
 }
 
 function parseHeaders(headers: Headers): UsageData | null {
-  const activeLimit = headers.get("x-codex-active-limit");
-  const prefix = activeLimit && activeLimit !== "codex" ? `x-codex-${activeLimit}` : "x-codex";
+  const prefix = resolveLimitPrefix(headers);
 
   const fiveHour = parseWindow(
-    headers.get(`${prefix}-primary-over-secondary-limit-percent`) ?? headers.get("x-codex-primary-over-secondary-limit-percent"),
-    headers.get(`${prefix}-primary-reset-at`) ?? headers.get("x-codex-primary-reset-at"),
+    getFirstPresentHeader(headers, headerCandidates(prefix, PRIMARY_PERCENT_HEADERS)),
+    getFirstPresentHeader(headers, headerCandidates(prefix, ["primary-reset-at"])),
     lastUsage?.fiveHour,
   );
   const sevenDay = parseWindow(
-    headers.get(`${prefix}-secondary-over-primary-limit-percent`) ?? headers.get("x-codex-secondary-over-primary-limit-percent"),
-    headers.get(`${prefix}-secondary-reset-at`) ?? headers.get("x-codex-secondary-reset-at"),
+    getFirstPresentHeader(headers, headerCandidates(prefix, SECONDARY_PERCENT_HEADERS)),
+    getFirstPresentHeader(headers, headerCandidates(prefix, ["secondary-reset-at"])),
     lastUsage?.sevenDay,
   );
 
   if (!fiveHour && !sevenDay) return null;
   return { fiveHour, sevenDay };
+}
+
+function resolveLimitPrefix(headers: Headers): string {
+  const activeLimit = headers.get("x-codex-active-limit")?.trim();
+  if (!activeLimit || activeLimit === "codex") return DEFAULT_LIMIT_PREFIX;
+  return `x-${activeLimit.toLowerCase().replaceAll("_", "-")}`;
+}
+
+function headerCandidates(prefix: string, suffixes: readonly string[]): string[] {
+  const names = suffixes.map((suffix) => `${prefix}-${suffix}`);
+  if (prefix !== DEFAULT_LIMIT_PREFIX) {
+    names.push(...suffixes.map((suffix) => `${DEFAULT_LIMIT_PREFIX}-${suffix}`));
+  }
+  return names;
+}
+
+function getFirstPresentHeader(headers: Headers, names: readonly string[]): string | null {
+  for (const name of names) {
+    const value = headers.get(name);
+    if (value != null) return value;
+  }
+  return null;
 }
 
 function parseWindow(percentValue: string | null, resetAtValue: string | null, previous?: UsageWindow | null): UsageWindow | null {
