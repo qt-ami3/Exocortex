@@ -48,7 +48,7 @@ describe("OpenAI usage header parsing", () => {
     });
   });
 
-  test("reads the active non-default codex limit family", () => {
+  test("reads the active non-default codex limit family and normalizes underscores to dashed header prefixes", () => {
     resetUsageStorage();
 
     const headers = new Headers({
