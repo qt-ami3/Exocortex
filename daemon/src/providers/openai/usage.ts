@@ -99,22 +99,51 @@ export function handleUsageHeaders(headers: Headers, onUpdate: (usage: UsageData
 }
 
 function parseHeaders(headers: Headers): UsageData | null {
-  const activeLimit = headers.get("x-codex-active-limit");
-  const prefix = activeLimit && activeLimit !== "codex" ? `x-codex-${activeLimit}` : "x-codex";
+  const prefix = resolveLimitPrefix(headers);
 
   const fiveHour = parseWindow(
-    headers.get(`${prefix}-primary-over-secondary-limit-percent`) ?? headers.get("x-codex-primary-over-secondary-limit-percent"),
-    headers.get(`${prefix}-primary-reset-at`) ?? headers.get("x-codex-primary-reset-at"),
+    firstHeader(headers, [
+      `${prefix}-primary-used-percent`,
+      `${prefix}-primary-over-secondary-limit-percent`,
+      "x-codex-primary-used-percent",
+      "x-codex-primary-over-secondary-limit-percent",
+    ]),
+    firstHeader(headers, [
+      `${prefix}-primary-reset-at`,
+      "x-codex-primary-reset-at",
+    ]),
     lastUsage?.fiveHour,
   );
   const sevenDay = parseWindow(
-    headers.get(`${prefix}-secondary-over-primary-limit-percent`) ?? headers.get("x-codex-secondary-over-primary-limit-percent"),
-    headers.get(`${prefix}-secondary-reset-at`) ?? headers.get("x-codex-secondary-reset-at"),
+    firstHeader(headers, [
+      `${prefix}-secondary-used-percent`,
+      `${prefix}-secondary-over-primary-limit-percent`,
+      "x-codex-secondary-used-percent",
+      "x-codex-secondary-over-primary-limit-percent",
+    ]),
+    firstHeader(headers, [
+      `${prefix}-secondary-reset-at`,
+      "x-codex-secondary-reset-at",
+    ]),
     lastUsage?.sevenDay,
   );
 
   if (!fiveHour && !sevenDay) return null;
   return { fiveHour, sevenDay };
+}
+
+function resolveLimitPrefix(headers: Headers): string {
+  const activeLimit = headers.get("x-codex-active-limit")?.trim();
+  if (!activeLimit || activeLimit === "codex") return "x-codex";
+  return `x-${activeLimit.toLowerCase().replaceAll("_", "-")}`;
+}
+
+function firstHeader(headers: Headers, names: string[]): string | null {
+  for (const name of names) {
+    const value = headers.get(name);
+    if (value != null) return value;
+  }
+  return null;
 }
 
 function parseWindow(percentValue: string | null, resetAtValue: string | null, previous?: UsageWindow | null): UsageWindow | null {
