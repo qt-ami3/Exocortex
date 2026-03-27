@@ -69,7 +69,7 @@ describe("/fast command", () => {
 
     expect(result).toEqual({ type: "handled" });
     expect(state.fastMode).toBe(false);
-    expect((state.messages.at(-1) as { text?: string } | undefined)?.text).toContain("only available for providers that support it");
+    expect((state.messages.at(-1) as { text?: string } | undefined)?.text).toBe("Fast mode is only available for anthropic conversations that support it.");
   });
 
   test("status check reports current fast mode", () => {

@@ -208,6 +208,8 @@ function buildOpenAITools(tools: StreamOptions["tools"]): OpenAIRequestShape["to
 
 function mapServiceTier(serviceTier: StreamOptions["serviceTier"]): string | undefined {
   switch (serviceTier) {
+    // OpenAI's Codex backend expects the fast tier under the wire value
+    // `priority`, even though the app-level setting is exposed as `fast`.
     case "fast":
       return "priority";
     default:

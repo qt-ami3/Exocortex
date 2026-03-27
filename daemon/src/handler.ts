@@ -80,7 +80,7 @@ export function createHandler(server: DaemonServer) {
         const effort = normalizeEffort(provider, model, cmd.effort);
         const fastMode = cmd.fastMode === true;
         if (fastMode && !supportsFastMode(provider)) {
-          server.sendTo(client, { type: "error", reqId: cmd.reqId, message: `Fast mode is only available for providers that support it. Current provider: ${provider}` });
+          server.sendTo(client, { type: "error", reqId: cmd.reqId, message: `Fast mode is only available for ${provider} conversations that support it.` });
           break;
         }
         convStore.create(id, provider, model, cmd.title, effort, fastMode);
@@ -211,7 +211,7 @@ export function createHandler(server: DaemonServer) {
             type: "error",
             reqId: cmd.reqId,
             convId: cmd.convId,
-            message: `Fast mode is not available for provider ${conv.provider}`,
+            message: `Fast mode is only available for ${conv.provider} conversations that support it.`,
           });
           break;
         }

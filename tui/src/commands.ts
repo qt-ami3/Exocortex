@@ -362,7 +362,7 @@ const commands: SlashCommand[] = [
       }
 
       if (!supportsFast) {
-        state.messages.push({ role: "system", text: `Fast mode is only available for providers that support it. Current provider: ${providerLabel}`, metadata: null });
+        state.messages.push({ role: "system", text: `Fast mode is only available for ${providerLabel} conversations that support it.`, metadata: null });
         clearPrompt(state);
         return { type: "handled" };
       }
