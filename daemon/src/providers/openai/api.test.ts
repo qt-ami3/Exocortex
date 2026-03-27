@@ -32,11 +32,11 @@ describe("OpenAI replay input", () => {
     expect(assistantItem?.id).toBeUndefined();
   });
 
-  test("request body forwards max_output_tokens", () => {
+  test("request body omits max_output_tokens on the codex backend", () => {
     const body = buildRequestBodyForTest([
       { role: "user", content: "hello" },
     ], "gpt-5.4", 1234, {});
 
-    expect(body.max_output_tokens).toBe(1234);
+    expect(body.max_output_tokens).toBeUndefined();
   });
 });

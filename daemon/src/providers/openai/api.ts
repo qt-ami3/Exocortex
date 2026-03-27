@@ -196,7 +196,7 @@ export function buildOpenAIInputForTest(messages: ApiMessage[]): unknown[] {
 export function buildRequestBodyForTest(
   messages: ApiMessage[],
   model: ModelId,
-  maxTokens: number,
+  _maxTokens: number,
   options: StreamOptions,
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {
@@ -212,7 +212,6 @@ export function buildRequestBodyForTest(
       summary: "concise",
     },
     instructions: options.system || "You are a helpful assistant.",
-    max_output_tokens: maxTokens,
   };
 
   if (options.tools && options.tools.length > 0) {
