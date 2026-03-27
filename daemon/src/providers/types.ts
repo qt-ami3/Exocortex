@@ -39,6 +39,7 @@ export interface StreamOptions {
   tools?: unknown[];
   effort?: EffortLevel;
   serviceTier?: ServiceTier;
+  promptCacheKey?: string;
 }
 
 export interface ProviderStreamMessage {
