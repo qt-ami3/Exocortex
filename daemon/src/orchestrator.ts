@@ -13,6 +13,7 @@ import { runAgentLoop, type AgentCallbacks, type AgentState } from "./agent";
 import { buildSystemPrompt } from "./system";
 import { getToolDefs, buildExecutor, summarizeTool, type ContextToolEnv } from "./tools/registry";
 import { runUserPromptSubmitHooks } from "./hooks";
+import { autoCompact as runAutoCompact, AUTO_COMPACT_THRESHOLD } from "./autocompact";
 import * as convStore from "./conversations";
 import type { DaemonServer, ConnectedClient } from "./server";
 import type { StoredMessage, ApiContentBlock } from "./messages";
@@ -323,6 +324,24 @@ export async function orchestrateSendMessage(
         });
       }
       return rebuilt;
+    },
+    async autoCompact(contextTokens: number) {
+      if (contextModifiedThisRound) return; // Context tool already handled it
+      if (contextTokens < AUTO_COMPACT_THRESHOLD) return;
+      convStore.pauseActivity(convId);
+      try {
+        const result = await runAutoCompact(conv, ac.signal);
+        if (result.modified) {
+          contextModifiedThisRound = true;
+          conv.messages.push({ role: "system", content: `⚡ ${result.report}`, metadata: null });
+          server.sendToSubscribers(convId, { type: "system_message", convId, text: `⚡ ${result.report}` });
+          log("info", `orchestrator: ${result.report}`);
+        }
+      } catch (err) {
+        log("error", `orchestrator: auto-compact failed: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        convStore.resumeActivity(convId);
+      }
     },
   };
 

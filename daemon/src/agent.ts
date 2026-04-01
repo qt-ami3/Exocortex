@@ -53,6 +53,12 @@ export interface AgentCallbacks {
    * Returns null if no rebuild is needed.
    */
   rebuildMessages?(): ApiMessage[] | null;
+  /**
+   * Called after tool execution to auto-compact the conversation when
+   * context tokens are high. The orchestrator decides whether compaction
+   * is needed based on the provided token count.
+   */
+  autoCompact?(contextTokens: number): Promise<void>;
 }
 
 // ── Tool execution ──────────────────────────────────────────────────
@@ -319,6 +325,11 @@ export async function runAgentLoop(
     const toolResultMsg: ApiMessage = { role: "user", content: toolResultContent };
     messages.push(toolResultMsg);
     newMessages.push(toolResultMsg);
+
+    // ── Auto-compact if context pressure is high ─────────────────
+    if (lastInputTokens > 0) {
+      await callbacks.autoCompact?.(lastInputTokens);
+    }
 
     // ── Context tool rebuild ─────────────────────────────────────
     const rebuilt = callbacks.rebuildMessages?.();
