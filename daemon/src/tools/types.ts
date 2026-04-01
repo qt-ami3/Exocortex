@@ -31,6 +31,10 @@ export interface Tool {
   /** Unique name matching the API tool_use name. */
   name: string;
 
+  /** True if this tool only reads state and never writes. Read-only tools
+   *  are safe to execute concurrently within the same batch. */
+  readOnly?: boolean;
+
   /** Description Claude sees in the tool list. */
   description: string;
 

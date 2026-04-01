@@ -191,6 +191,7 @@ function summarize(input: Record<string, unknown>): ToolSummary {
 
 export const browse: Tool = {
   name: "browse",
+  readOnly: true,
   description: "Read content from a URL. Supports web pages, feeds, APIs, and community sites.",
   inputSchema: {
     type: "object",

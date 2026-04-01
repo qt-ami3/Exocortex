@@ -126,6 +126,7 @@ function summarize(input: Record<string, unknown>): ToolSummary {
 
 export const glob: Tool = {
   name: "glob",
+  readOnly: true,
   description: "Fast file pattern matching. Supports glob patterns like \"**/*.ts\" or \"src/**/*.tsx\". Returns matching file paths sorted by modification time (most recent first).",
   inputSchema: {
     type: "object",

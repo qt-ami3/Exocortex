@@ -130,25 +130,71 @@ async function execTool(
 
 // ── Build executor (injected into the agent loop) ──────────────────
 
+/** Check if a tool call targets a read-only tool. */
+function isReadOnly(call: ApiToolCall): boolean {
+  const tool = toolMap.get(call.name);
+  return tool?.readOnly === true;
+}
+
+/** Execute a single tool call, routing special tools (context, bash) appropriately. */
+function execSingle(
+  call: ApiToolCall,
+  contextEnv: ContextToolEnv | undefined,
+  signal?: AbortSignal,
+): Promise<ToolExecResult> {
+  if (call.name === "context" && contextEnv) {
+    return execTool(call, executeContext(call.input, contextEnv, signal), signal);
+  }
+  if (call.name === "bash") {
+    return execTool(call, executeBashBackgroundable(call.input, signal, TOOL_BACKGROUND_SECONDS * 1000), signal);
+  }
+  const tool = toolMap.get(call.name);
+  if (!tool) {
+    return Promise.resolve({ toolCallId: call.id, toolName: call.name, output: `Unknown tool: ${call.name}`, isError: true });
+  }
+  return execTool(call, tool.execute(call.input, signal), signal);
+}
+
+/**
+ * Partition tool calls into batches: consecutive read-only calls form a
+ * parallel batch, write calls each form a single-item serial batch.
+ * Returns an array of batches preserving original call order.
+ */
+function partitionBatches(calls: ApiToolCall[]): ApiToolCall[][] {
+  const batches: ApiToolCall[][] = [];
+  let currentReadBatch: ApiToolCall[] | null = null;
+
+  for (const call of calls) {
+    if (isReadOnly(call)) {
+      if (!currentReadBatch) currentReadBatch = [];
+      currentReadBatch.push(call);
+    } else {
+      if (currentReadBatch) {
+        batches.push(currentReadBatch);
+        currentReadBatch = null;
+      }
+      batches.push([call]);
+    }
+  }
+  if (currentReadBatch) batches.push(currentReadBatch);
+
+  return batches;
+}
+
 export function buildExecutor(
   contextEnv?: ContextToolEnv,
 ): (calls: ApiToolCall[], signal?: AbortSignal) => Promise<ToolExecResult[]> {
-  return (calls, signal?) => Promise.all(calls.map(async (call): Promise<ToolExecResult> => {
-    // Context tool — needs conversation access, bypass normal execute()
-    if (call.name === "context" && contextEnv) {
-      return execTool(call, executeContext(call.input, contextEnv, signal), signal);
+  return async (calls, signal?) => {
+    const batches = partitionBatches(calls);
+    const results: ToolExecResult[] = [];
+
+    for (const batch of batches) {
+      const batchResults = await Promise.all(
+        batch.map(call => execSingle(call, contextEnv, signal)),
+      );
+      results.push(...batchResults);
     }
 
-    // Bash tool — use backgroundable executor so long-running commands
-    // are detached after TOOL_BACKGROUND_SECONDS instead of blocking.
-    if (call.name === "bash") {
-      return execTool(call, executeBashBackgroundable(call.input, signal, TOOL_BACKGROUND_SECONDS * 1000), signal);
-    }
-
-    const tool = toolMap.get(call.name);
-    if (!tool) {
-      return { toolCallId: call.id, toolName: call.name, output: `Unknown tool: ${call.name}`, isError: true };
-    }
-    return execTool(call, tool.execute(call.input, signal), signal);
-  }));
+    return results;
+  };
 }

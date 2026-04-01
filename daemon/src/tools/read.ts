@@ -233,6 +233,7 @@ function summarize(input: Record<string, unknown>): ToolSummary {
 
 export const read: Tool = {
   name: "read",
+  readOnly: true,
   description: "Read a file from the local filesystem. Returns file content with line numbers (cat -n format). By default reads up to 2000 lines. Lines longer than 2000 characters are truncated. For image files (PNG, JPEG, GIF, WebP, BMP, TIFF, SVG, AVIF, ICO), returns the image for visual inspection; large images are automatically compressed to fit API limits.",
   inputSchema: {
     type: "object",
