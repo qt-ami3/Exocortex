@@ -12,6 +12,7 @@ import { loadAuth } from "./store";
 import { runAgentLoop, type AgentCallbacks, type AgentState } from "./agent";
 import { buildSystemPrompt } from "./system";
 import { getToolDefs, buildExecutor, summarizeTool, type ContextToolEnv } from "./tools/registry";
+import { runUserPromptSubmitHooks } from "./hooks";
 import * as convStore from "./conversations";
 import type { DaemonServer, ConnectedClient } from "./server";
 import type { StoredMessage, ApiContentBlock } from "./messages";
@@ -102,7 +103,15 @@ export async function orchestrateSendMessage(
     return;
   }
 
-  conv.messages.push({ role: "user", content: buildUserContent(text, images), metadata: null });
+  // UserPromptSubmit hooks — can block or modify the prompt
+  const promptHook = await runUserPromptSubmitHooks(text);
+  if (promptHook.blocked) {
+    if (client) server.sendTo(client, { type: "error", reqId, convId, message: `Hook blocked: ${promptHook.reason}` });
+    return;
+  }
+  const effectiveText = promptHook.updatedText ?? text;
+
+  conv.messages.push({ role: "user", content: buildUserContent(effectiveText, images), metadata: null });
   conv.updatedAt = Date.now();
   convStore.bumpToTop(convId);
 

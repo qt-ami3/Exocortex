@@ -17,6 +17,7 @@ import { edit } from "./edit";
 import { browse } from "./browse";
 import { context, executeContext, type ContextToolEnv } from "./context";
 import { TOOL_BACKGROUND_SECONDS } from "../constants";
+import { runPreToolUseHooks, runPostToolUseHooks } from "../hooks";
 
 export type { ContextToolEnv };
 
@@ -190,7 +191,22 @@ export function buildExecutor(
 
     for (const batch of batches) {
       const batchResults = await Promise.all(
-        batch.map(call => execSingle(call, contextEnv, signal)),
+        batch.map(async (call): Promise<ToolExecResult> => {
+          // PreToolUse hooks — can block or modify input
+          const pre = await runPreToolUseHooks(call.name, call.input);
+          if (pre.blocked) {
+            return { toolCallId: call.id, toolName: call.name, output: `Hook blocked: ${pre.reason}`, isError: true };
+          }
+          const effectiveCall = pre.updatedInput ? { ...call, input: pre.updatedInput } : call;
+
+          // Execute
+          const result = await execSingle(effectiveCall, contextEnv, signal);
+
+          // PostToolUse hooks — informational, cannot block
+          await runPostToolUseHooks(effectiveCall.name, effectiveCall.input, result.output, result.isError);
+
+          return result;
+        }),
       );
       results.push(...batchResults);
     }
