@@ -10,6 +10,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { buildToolSystemHints } from "./tools/registry";
 import { getExternalToolHints } from "./external-tools";
+import { loadClaudeMd } from "./claudemd";
 import { configDir } from "@exocortex/shared/paths";
 
 // ── User system prompt addendum ───────────────────────────────────
@@ -49,6 +50,9 @@ export function buildSystemPrompt(): string {
 
   const externalHints = getExternalToolHints();
   if (externalHints) parts.push("# External tools\n" + externalHints);
+
+  const claudeMd = loadClaudeMd();
+  if (claudeMd) parts.push(claudeMd);
 
   if (_userAddendum) parts.push(_userAddendum);
 
