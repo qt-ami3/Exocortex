@@ -1,15 +1,15 @@
 /**
- * CLAUDE.md discovery — loads project-level instructions from the filesystem.
+ * CORTEX.md discovery — loads project-level instructions from the filesystem.
  *
  * Traverses from the git root (or filesystem root) down to cwd, collecting:
- *   - CLAUDE.md at each directory level
- *   - .claude/CLAUDE.md at each level
- *   - .claude/rules/*.md at each level
- * Also loads user-level CLAUDE.md from the Exocortex config directory.
+ *   - CORTEX.md at each directory level
+ *   - .cortex/CORTEX.md at each level
+ *   - .cortex/rules/*.md at each level
+ * Also loads user-level CORTEX.md from the Exocortex config directory.
  *
  * Supports @include directives: a line like `@include path/to/file.md`
  * is replaced with the contents of the referenced file (relative to
- * the CLAUDE.md that contains the directive).
+ * the CORTEX.md that contains the directive).
  *
  * Content is injected into the system prompt so the AI follows
  * project-specific guidelines automatically.
@@ -58,21 +58,21 @@ function readMd(filePath: string, baseDir: string): string | null {
 
 // ── Discovery ───────────────────────────────────────────────────────
 
-interface ClaudeMdEntry {
+interface CortexMdEntry {
   label: string;
   content: string;
 }
 
-function discover(cwd: string): ClaudeMdEntry[] {
-  const entries: ClaudeMdEntry[] = [];
+function discover(cwd: string): CortexMdEntry[] {
+  const entries: CortexMdEntry[] = [];
   const gitRoot = findGitRoot(cwd);
   const stopAt = gitRoot ? resolve(gitRoot) : null;
 
-  // 1. User-level CLAUDE.md (most general)
+  // 1. User-level CORTEX.md (most general)
   const userDir = configDir();
-  const userContent = readMd(join(userDir, "CLAUDE.md"), userDir);
+  const userContent = readMd(join(userDir, "CORTEX.md"), userDir);
   if (userContent) {
-    entries.push({ label: "(user) CLAUDE.md", content: userContent });
+    entries.push({ label: "(user) CORTEX.md", content: userContent });
   }
 
   // 2. Collect directories from cwd up to git root (or filesystem root)
@@ -87,33 +87,33 @@ function discover(cwd: string): ClaudeMdEntry[] {
   }
   dirs.reverse(); // root → cwd order (outermost first)
 
-  // 3. Check each level for CLAUDE.md files
+  // 3. Check each level for CORTEX.md files
   for (const d of dirs) {
     const rel = relative(cwd, d);
     const prefix = rel === "" ? "" : rel + "/";
 
-    // CLAUDE.md at this level
-    const content = readMd(join(d, "CLAUDE.md"), d);
+    // CORTEX.md at this level
+    const content = readMd(join(d, "CORTEX.md"), d);
     if (content) {
-      entries.push({ label: `${prefix}CLAUDE.md`, content });
+      entries.push({ label: `${prefix}CORTEX.md`, content });
     }
 
-    // .claude/CLAUDE.md
-    const dotClaudeDir = join(d, ".claude");
-    const dotContent = readMd(join(dotClaudeDir, "CLAUDE.md"), dotClaudeDir);
+    // .cortex/CORTEX.md
+    const dotCortexDir = join(d, ".cortex");
+    const dotContent = readMd(join(dotCortexDir, "CORTEX.md"), dotCortexDir);
     if (dotContent) {
-      entries.push({ label: `${prefix}.claude/CLAUDE.md`, content: dotContent });
+      entries.push({ label: `${prefix}.cortex/CORTEX.md`, content: dotContent });
     }
 
-    // .claude/rules/*.md
-    const rulesDir = join(dotClaudeDir, "rules");
+    // .cortex/rules/*.md
+    const rulesDir = join(dotCortexDir, "rules");
     if (existsSync(rulesDir)) {
       try {
         const mdFiles = readdirSync(rulesDir).filter(f => f.endsWith(".md")).sort();
         for (const f of mdFiles) {
           const ruleContent = readMd(join(rulesDir, f), rulesDir);
           if (ruleContent) {
-            entries.push({ label: `${prefix}.claude/rules/${f}`, content: ruleContent });
+            entries.push({ label: `${prefix}.cortex/rules/${f}`, content: ruleContent });
           }
         }
       } catch { /* rulesDir exists but unreadable — skip */ }
@@ -126,17 +126,17 @@ function discover(cwd: string): ClaudeMdEntry[] {
 // ── Public API ──────────────────────────────────────────────────────
 
 /**
- * Discover and load all CLAUDE.md files relevant to the current working directory.
+ * Discover and load all CORTEX.md files relevant to the current working directory.
  * Returns a formatted string ready for system prompt injection, or empty string
  * if no files were found.
  */
-export function loadClaudeMd(): string {
+export function loadCortexMd(): string {
   const cwd = process.cwd();
   const entries = discover(cwd);
 
   if (entries.length === 0) return "";
 
-  log("info", `claudemd: loaded ${entries.length} file(s): ${entries.map(e => e.label).join(", ")}`);
+  log("info", `cortexmd: loaded ${entries.length} file(s): ${entries.map(e => e.label).join(", ")}`);
 
   const sections = entries.map(e => `## ${e.label}\n${e.content}`);
   return "# Project instructions\n\n" + sections.join("\n\n");
