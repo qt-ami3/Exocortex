@@ -11,26 +11,23 @@ import {
   type ReasoningEffortInfo,
 } from "@exocortex/shared/messages";
 import { log } from "../log";
-import { fetchAnthropicModels, FALLBACK_ANTHROPIC_MODELS } from "./anthropic/models";
-import { fetchOpenAIModels, FALLBACK_OPENAI_MODELS } from "./openai/models";
+import { getProviderAdapter, getProviderAdapters } from "./catalog";
+
+function buildFallbackProviderInfo(providerId: ProviderId): ProviderInfo {
+  const adapter = getProviderAdapter(providerId);
+  return {
+    id: adapter.id,
+    label: adapter.label,
+    defaultModel: DEFAULT_MODEL_BY_PROVIDER[providerId],
+    allowsCustomModels: adapter.allowsCustomModels,
+    supportsFastMode: adapter.supportsFastMode,
+    models: [...adapter.models.fallbackModels],
+  };
+}
 
 const FALLBACK_PROVIDERS_BY_ID: Record<ProviderId, ProviderInfo> = {
-  openai: {
-    id: "openai",
-    label: "OpenAI",
-    defaultModel: DEFAULT_MODEL_BY_PROVIDER.openai,
-    allowsCustomModels: true,
-    supportsFastMode: true,
-    models: [...FALLBACK_OPENAI_MODELS],
-  },
-  anthropic: {
-    id: "anthropic",
-    label: "Anthropic",
-    defaultModel: DEFAULT_MODEL_BY_PROVIDER.anthropic,
-    allowsCustomModels: false,
-    supportsFastMode: false,
-    models: [...FALLBACK_ANTHROPIC_MODELS],
-  },
+  openai: buildFallbackProviderInfo("openai"),
+  anthropic: buildFallbackProviderInfo("anthropic"),
 };
 
 const FALLBACK_PROVIDERS: ProviderInfo[] = DEFAULT_PROVIDER_ORDER.map((providerId) => FALLBACK_PROVIDERS_BY_ID[providerId]);
@@ -54,15 +51,14 @@ function chooseDefaultModel(providerId: ProviderId, models: ModelInfo[]): ModelI
 
 async function refreshProviderInfo(fallback: ProviderInfo): Promise<ProviderInfo> {
   try {
-    const models = fallback.id === "anthropic"
-      ? await fetchAnthropicModels()
-      : await fetchOpenAIModels();
+    const adapter = getProviderAdapter(fallback.id);
+    const models = await adapter.models.fetch();
     return {
       id: fallback.id,
-      label: fallback.label,
+      label: adapter.label,
       defaultModel: chooseDefaultModel(fallback.id, models),
-      allowsCustomModels: fallback.allowsCustomModels,
-      supportsFastMode: fallback.supportsFastMode,
+      allowsCustomModels: adapter.allowsCustomModels,
+      supportsFastMode: adapter.supportsFastMode,
       models,
     };
   } catch (err) {
@@ -130,7 +126,7 @@ export async function refreshProviders(force = false): Promise<boolean> {
   if (inflightRefresh) return inflightRefresh;
 
   inflightRefresh = (async () => {
-    const next = await Promise.all(FALLBACK_PROVIDERS.map((provider) => refreshProviderInfo(provider)));
+    const next = await Promise.all(getProviderAdapters().map((provider) => refreshProviderInfo(FALLBACK_PROVIDERS_BY_ID[provider.id])));
     const changed = JSON.stringify(providerCache) !== JSON.stringify(next);
     providerCache = next;
     lastRefreshAt = Date.now();

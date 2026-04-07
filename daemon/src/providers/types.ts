@@ -1,4 +1,6 @@
-import type { ModelId, EffortLevel, ApiMessage } from "../messages";
+import type { ModelId, EffortLevel, ApiMessage, ProviderId, ModelInfo, UsageData } from "../messages";
+import type { OAuthProfile, StoredTokens } from "../store";
+import type { AssistantProviderData } from "./provider-data";
 
 export type ServiceTier = "fast";
 
@@ -20,7 +22,7 @@ export interface StreamResult {
   toolCalls: ApiToolCall[];
   inputTokens?: number;
   outputTokens?: number;
-  assistantProviderData?: Record<string, unknown>;
+  assistantProviderData?: AssistantProviderData;
 }
 
 export interface StreamCallbacks {
@@ -49,4 +51,52 @@ export interface ProviderStreamMessage {
     callbacks: StreamCallbacks,
     options?: StreamOptions,
   ): Promise<StreamResult>;
+}
+
+export interface LoginResult {
+  tokens: StoredTokens;
+  profile: OAuthProfile | null;
+}
+
+export interface LoginCallbacks {
+  onProgress?: (msg: string) => void;
+  onOpenUrl?: (url: string) => void;
+}
+
+export interface EnsureAuthResult {
+  status: "already_authenticated" | "refreshed" | "logged_in";
+  email: string | null;
+}
+
+export interface ProviderModelSource {
+  fallbackModels: ModelInfo[];
+  fetch(): Promise<ModelInfo[]>;
+}
+
+export interface ProviderAuthAdapter {
+  login(callbacks?: LoginCallbacks | ((msg: string) => void)): Promise<LoginResult>;
+  ensureAuthenticated(callbacks?: LoginCallbacks): Promise<EnsureAuthResult>;
+  refreshTokens?: (refreshToken: string) => Promise<unknown>;
+  verifyAuth(accessToken: string): Promise<boolean>;
+  clearAuth(): boolean;
+  hasConfiguredCredentials(): boolean;
+}
+
+export interface ProviderUsageAdapter {
+  getLastUsage(): UsageData | null;
+  refreshUsage(onUpdate: (usage: UsageData) => void): void;
+  handleUsageHeaders(headers: Headers, onUpdate: (usage: UsageData) => void): void;
+  clearUsage(): void;
+}
+
+export interface ProviderAdapter {
+  id: ProviderId;
+  label: string;
+  defaultModel: ModelId;
+  allowsCustomModels: boolean;
+  supportsFastMode: boolean;
+  models: ProviderModelSource;
+  auth: ProviderAuthAdapter;
+  usage: ProviderUsageAdapter;
+  streamMessage: ProviderStreamMessage;
 }

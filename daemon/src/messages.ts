@@ -13,6 +13,7 @@ export * from "@exocortex/shared/messages";
 // ── API-level types (for stored conversations / API replay) ─────────
 
 import { DEFAULT_EFFORT, type ProviderId, type ModelId, type EffortLevel, type MessageMetadata } from "@exocortex/shared/messages";
+import type { AssistantProviderData } from "./providers/provider-data";
 
 export type ApiContentBlock =
   | { type: "text"; text: string; cache_control?: { type: "ephemeral" } }
@@ -24,7 +25,7 @@ export type ApiContentBlock =
 export interface ApiMessage {
   role: "user" | "assistant";
   content: string | ApiContentBlock[];
-  providerData?: Record<string, unknown>;
+  providerData?: AssistantProviderData;
 }
 
 /** A message with optional metadata for persistence. */
@@ -32,7 +33,7 @@ export interface StoredMessage {
   role: "user" | "assistant" | "system" | "system_instructions";
   content: string | ApiContentBlock[];
   metadata: MessageMetadata | null;
-  providerData?: Record<string, unknown>;
+  providerData?: AssistantProviderData;
 }
 
 // ── Conversation state ──────────────────────────────────────────────

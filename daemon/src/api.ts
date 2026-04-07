@@ -1,10 +1,7 @@
 import type { ProviderId, ModelId, EffortLevel, ApiMessage, ApiContentBlock } from "./messages";
-import {
-  streamMessage as streamAnthropicMessage,
-} from "./providers/anthropic/api";
-import { streamMessage as streamOpenAIMessage } from "./providers/openai/api";
+import { getProviderAdapter } from "./providers/catalog";
 import type { ApiToolCall, ContentBlock, StreamResult, StreamCallbacks, StreamOptions } from "./providers/types";
-import { AuthError } from "./providers/anthropic/auth";
+import { AuthError } from "./providers/errors";
 
 export type { ApiMessage, ApiContentBlock };
 export type { ApiToolCall, ContentBlock, StreamResult, StreamCallbacks, StreamOptions };
@@ -17,12 +14,5 @@ export async function streamMessage(
   callbacks: StreamCallbacks,
   options: StreamOptions = {},
 ): Promise<StreamResult> {
-  switch (provider) {
-    case "anthropic":
-      return streamAnthropicMessage(messages, model, callbacks, options);
-    case "openai":
-      return streamOpenAIMessage(messages, model, callbacks, options);
-    default:
-      throw new Error(`API streaming is not implemented for provider: ${provider}`);
-  }
+  return getProviderAdapter(provider).streamMessage(messages, model, callbacks, options);
 }

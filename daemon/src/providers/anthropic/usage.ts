@@ -5,12 +5,13 @@
 import { join } from "path";
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
 import { log } from "../../log";
-import { loadAuth } from "../../store";
+import { loadProviderAuth, type StoredAuth } from "../../store";
 import { runtimeDir } from "@exocortex/shared/paths";
 import { ANTHROPIC_BASE_URL } from "./constants";
 import type { UsageData, UsageWindow } from "../../messages";
 
 const USAGE_FILE = join(runtimeDir(), "usage-anthropic.json");
+const ANTHROPIC_PROVIDER_ID = "anthropic";
 
 function loadFromDisk(): UsageData | null {
   try {
@@ -77,7 +78,7 @@ function scheduleResetRefresh(usage: UsageData, onUpdate: (u: UsageData) => void
 }
 
 export function refreshUsage(onUpdate: (usage: UsageData) => void): void {
-  const auth = loadAuth();
+  const auth = loadProviderAuth<StoredAuth>(ANTHROPIC_PROVIDER_ID);
   if (!auth?.tokens?.accessToken) {
     log("warn", "usage: no access token, skipping refresh");
     return;

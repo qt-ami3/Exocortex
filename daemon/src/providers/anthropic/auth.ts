@@ -6,16 +6,18 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
-import { randomBytes, createHash } from "crypto";
 import { log } from "../../log";
 import { ANTHROPIC_BASE_URL } from "./constants";
-import { clearAuth, loadAuth, saveAuth, isTokenExpired, type StoredTokens, type OAuthProfile } from "../../store";
-import { isWindows } from "@exocortex/shared/paths";
+import { clearProviderAuth, isTokenExpired, loadProviderAuth, saveProviderAuth, type StoredTokens, type OAuthProfile, type StoredAuth } from "../../store";
+import { AuthError } from "../errors";
+import { generateCodeChallenge, generateCodeVerifier, generateState, openUrlInBrowser } from "../oauth";
+import type { EnsureAuthResult, LoginCallbacks, LoginResult } from "../types";
 
 const CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const CLAUDEAI_AUTHORIZE_URL = "https://claude.ai/oauth/authorize";
 const TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
 const SUCCESS_URL = "https://platform.claude.com/oauth/code/success?app=claude-code";
+const ANTHROPIC_PROVIDER_ID = "anthropic";
 
 const CLAUDE_AI_SCOPES = [
   "user:profile",
@@ -23,29 +25,6 @@ const CLAUDE_AI_SCOPES = [
   "user:sessions:claude_code",
   "user:mcp_servers",
 ];
-
-function base64url(buffer: Buffer): string {
-  return buffer.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-}
-
-function generateCodeVerifier(length = 64): string {
-  return base64url(randomBytes(length)).slice(0, length);
-}
-
-function generateCodeChallenge(verifier: string): string {
-  return base64url(createHash("sha256").update(verifier).digest());
-}
-
-function generateState(): string {
-  return base64url(randomBytes(32));
-}
-
-export class AuthError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AuthError";
-  }
-}
 
 interface CallbackResult {
   code: string;
@@ -172,6 +151,14 @@ function mapSubscription(orgType: string | null | undefined): string | null {
   }
 }
 
+function loadStoredAuth(): StoredAuth | null {
+  return loadProviderAuth<StoredAuth>(ANTHROPIC_PROVIDER_ID);
+}
+
+function saveStoredAuth(auth: StoredAuth): void {
+  saveProviderAuth(ANTHROPIC_PROVIDER_ID, auth);
+}
+
 let inflightRefresh: Promise<StoredTokens> | null = null;
 
 export async function refreshTokens(refreshToken: string): Promise<StoredTokens> {
@@ -229,7 +216,7 @@ export async function verifyAuth(accessToken: string): Promise<boolean> {
 }
 
 export async function getVerifiedAccessToken(): Promise<string> {
-  const auth = loadAuth();
+  const auth = loadStoredAuth();
   if (!auth?.tokens?.accessToken) {
     throw new AuthError("Anthropic is not authenticated. Run `bun run src/main.ts login anthropic`.");
   }
@@ -239,30 +226,15 @@ export async function getVerifiedAccessToken(): Promise<string> {
       throw new AuthError("Anthropic token expired and no refresh token is available.");
     }
     const newTokens = await refreshTokens(auth.tokens.refreshToken);
-    saveAuth({ ...auth, tokens: newTokens, updatedAt: new Date().toISOString() });
+    saveStoredAuth({ ...auth, tokens: newTokens, updatedAt: new Date().toISOString() });
     return newTokens.accessToken;
   }
 
   return auth.tokens.accessToken;
 }
 
-export interface LoginResult {
-  tokens: StoredTokens;
-  profile: OAuthProfile | null;
-}
-
-export interface LoginCallbacks {
-  onProgress?: (msg: string) => void;
-  onOpenUrl?: (url: string) => void;
-}
-
-export interface EnsureAuthResult {
-  status: "already_authenticated" | "refreshed" | "logged_in";
-  email: string | null;
-}
-
 export async function ensureAuthenticated(callbacks?: LoginCallbacks): Promise<EnsureAuthResult> {
-  const existing = loadAuth();
+  const existing = loadStoredAuth();
 
   if (existing?.tokens?.accessToken && !isTokenExpired(existing.tokens)) {
     const valid = await verifyAuth(existing.tokens.accessToken);
@@ -274,32 +246,29 @@ export async function ensureAuthenticated(callbacks?: LoginCallbacks): Promise<E
   if (existing?.tokens?.refreshToken) {
     try {
       const newTokens = await refreshTokens(existing.tokens.refreshToken);
-      saveAuth({ ...existing, tokens: newTokens, updatedAt: new Date().toISOString() });
+      saveStoredAuth({ ...existing, tokens: newTokens, updatedAt: new Date().toISOString() });
       return { status: "refreshed", email: existing.profile?.email ?? null };
     } catch { /* refresh failed — fall through to full login */ }
   }
 
   const result = await login(callbacks);
-  saveAuth({ tokens: result.tokens, profile: result.profile, updatedAt: new Date().toISOString() });
+  saveStoredAuth({ tokens: result.tokens, profile: result.profile, updatedAt: new Date().toISOString() });
   return { status: "logged_in", email: result.profile?.email ?? null };
 }
 
 export function hasConfiguredCredentials(): boolean {
-  const auth = loadAuth();
+  const auth = loadStoredAuth();
   return !!auth?.tokens?.accessToken || !!auth?.tokens?.refreshToken;
 }
 
-export { clearAuth };
+export function clearAuth(): boolean {
+  return clearProviderAuth(ANTHROPIC_PROVIDER_ID);
+}
 
 export async function login(callbacks?: LoginCallbacks | ((msg: string) => void)): Promise<LoginResult> {
   const cbs: LoginCallbacks = typeof callbacks === "function" ? { onProgress: callbacks } : callbacks ?? {};
   const say = cbs.onProgress ?? console.log;
-  const openUrl = cbs.onOpenUrl ?? ((url: string) => {
-    const openCmd = isWindows
-      ? ["powershell", "-NoProfile", "-Command", `Start-Process "${url}"`]
-      : ["xdg-open", url];
-    Bun.spawn(openCmd, { stdout: "ignore", stderr: "ignore" }).unref();
-  });
+  const openUrl = cbs.onOpenUrl ?? openUrlInBrowser;
 
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);

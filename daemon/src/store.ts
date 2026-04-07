@@ -114,18 +114,6 @@ export function hasProviderAuth(provider: ProviderId): boolean {
   return loadProviderAuth(provider) !== null;
 }
 
-export function saveAuth(auth: StoredAuth): void {
-  saveProviderAuth("anthropic", auth);
-}
-
-export function loadAuth(): StoredAuth | null {
-  return loadProviderAuth<StoredAuth>("anthropic");
-}
-
-export function clearAuth(): boolean {
-  return clearProviderAuth("anthropic");
-}
-
 export function isTokenExpired(tokens: StoredTokens): boolean {
   if (!tokens.expiresAt) return true;
   return Date.now() >= tokens.expiresAt - 300_000; // 5 min buffer

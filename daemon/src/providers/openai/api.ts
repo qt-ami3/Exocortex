@@ -1,6 +1,7 @@
 import type { ApiMessage, ModelId } from "../../messages";
 import { createAbortError, isAbortLikeError } from "../../abort";
-import { getVerifiedSession, AuthError } from "./auth";
+import { getVerifiedSession } from "./auth";
+import { AuthError } from "../errors";
 import { OPENAI_CODEX_RESPONSES_URL, OPENAI_ORIGINATOR } from "./constants";
 import { buildOpenAIInput, buildRequestBody } from "./request";
 import { mergeReasoningSummaries } from "./reasoning";

@@ -1,6 +1,6 @@
 import type { ApiMessage, ApiContentBlock, ModelId, EffortLevel } from "../../messages";
 import type { StreamOptions } from "../types";
-import type { OpenAIAssistantProviderData, OpenAIReasoningItem } from "./types";
+import type { OpenAIReasoningItem } from "./types";
 
 export type OpenAIInputItem =
   | { role: "user"; content: Array<{ type: "input_text"; text: string } | { type: "input_image"; image_url: string }> }
@@ -134,7 +134,7 @@ export function buildOpenAIInput(messages: ApiMessage[]): OpenAIInputItem[] {
       continue;
     }
 
-    const providerData = (message.providerData as OpenAIAssistantProviderData | undefined)?.openai;
+    const providerData = message.providerData?.openai;
     const reasoningItems = providerData?.reasoningItems ?? [];
     for (const reasoning of reasoningItems) {
       input.push({
