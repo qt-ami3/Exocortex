@@ -102,7 +102,7 @@ const MACROS: MacroDef[] = [
   { name: "/thoughts", desc: "Tell me your thoughts", expansion: "Can you tell me your thoughts on this?" },
   { name: "/long", desc: "Work until complete", expansion: "This is a long running task, work tirelessly until you can verify that everything is complete and correct" },
   { name: "/diagnose", desc: "Pinpoint the cause", expansion: "Can you pinpoint the exact cause and tell me your diagnosis?" },
-  { name: "/quality", desc: "Code quality assessment", expansion: "Give your changes a code quality assesment. Is there anything that should be split off into other files, de-duplicated, or made more clear?" },
+  { name: "/quality", desc: "Code quality assessment", expansion: "Give the changes a code quality assesment. Is there anything that should be split off into other files, de-duplicated, or made more clear? If so, do it." },
   {
     name: "/worktree", desc: "Work in a git worktree",
     expansion: "Work in a git worktree for this task. Find the repo root first (the directory containing `.git/`; don't assume CWD is it). Create the worktree with `git worktree add .worktrees/<name> -b <name> HEAD` from there. When I say I'm satisfied, merge back to main and clean up: run `git worktree remove .worktrees/<name>`, delete the branch with `git branch -d <name>`, and remove the leftover config dirs `~/.config/exocortex/runtime/<name>/` and `~/.config/exocortex/data/instances/<name>/`.",
