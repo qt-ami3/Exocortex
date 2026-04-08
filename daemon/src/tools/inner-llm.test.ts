@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_PROVIDER_ID } from "@exocortex/shared/messages";
+import { isKnownModel } from "../providers/registry";
 import { getInnerLlmSummaryOptions } from "./inner-llm";
 
 describe("getInnerLlmSummaryOptions", () => {
@@ -21,5 +22,12 @@ describe("getInnerLlmSummaryOptions", () => {
       provider: "openai",
       model: "gpt-5.4-mini",
     });
+  });
+
+  test("always chooses a model known to the selected provider", () => {
+    for (const provider of ["openai", "anthropic"] as const) {
+      const options = getInnerLlmSummaryOptions({ provider });
+      expect(isKnownModel(provider, options.model)).toBe(true);
+    }
   });
 });

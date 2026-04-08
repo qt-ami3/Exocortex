@@ -16,6 +16,7 @@ import * as convStore from "./conversations";
 import type { DaemonServer, ConnectedClient } from "./server";
 import type { StoredMessage, ApiContentBlock } from "./messages";
 import type { ImageAttachment } from "@exocortex/shared/messages";
+import type { ToolExecutionContext } from "./tools/types";
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -184,7 +185,7 @@ export async function orchestrateSendMessage(
   // conv.messages yet. So protectedTailCount = 1 (just the user msg).
   const protectedTailCount = 1;
 
-  const toolContext = {
+  const toolContext: ToolExecutionContext = {
     provider: conv.provider,
     conversationId: convId,
   };
