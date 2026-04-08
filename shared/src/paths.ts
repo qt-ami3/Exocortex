@@ -4,6 +4,7 @@
  * All paths are resolved relative to the repo root, detected from
  * the source file's own location via import.meta.dir. This means
  * everything works regardless of CWD or where the repo is moved to.
+ * Tests can override the config root via EXOCORTEX_CONFIG_DIR.
  *
  * Directory layout under <repo>/config/:
  *
@@ -44,7 +45,9 @@ function detectRepoRoot(): string {
 }
 
 const REPO_ROOT = detectRepoRoot();
-const CONFIG_DIR = join(REPO_ROOT, "config");
+const CONFIG_DIR = process.env.EXOCORTEX_CONFIG_DIR?.trim()
+  ? resolve(process.env.EXOCORTEX_CONFIG_DIR)
+  : join(REPO_ROOT, "config");
 
 // ── Worktree detection ──────────────────────────────────────────────
 

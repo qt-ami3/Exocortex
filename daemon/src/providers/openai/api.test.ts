@@ -258,8 +258,8 @@ describe("OpenAI reasoning summaries", () => {
       onThinking(chunk) { thinkingChunks.push(chunk); },
     });
 
-    expect(blockStarts).toEqual(["thinking"]);
-    expect(thinkingChunks).toEqual(["first section"]);
+    expect(blockStarts).toEqual(["thinking", "thinking"]);
+    expect(thinkingChunks).toEqual(["first section", "second section"]);
     expect(result.thinking).toBe("first sectionsecond section");
     expect(result.blocks).toEqual([
       { type: "thinking", text: "first section", signature: "" },
@@ -277,6 +277,88 @@ describe("OpenAI reasoning summaries", () => {
         ],
       },
     });
+  });
+
+  test("backfills assistant text that only appears in the completed payload", () => {
+    const blockStarts: Array<"text" | "thinking"> = [];
+    const textChunks: string[] = [];
+    const result = readOpenAIEventsForTest([
+      {
+        type: "response.output_item.added",
+        output_index: 0,
+        item: { type: "message", id: "msg_1" },
+      },
+      {
+        type: "response.output_text.delta",
+        item_id: "msg_1",
+        delta: "hello",
+      },
+      {
+        type: "response.completed",
+        response: {
+          output: [
+            {
+              type: "message",
+              id: "msg_1",
+              content: [{ type: "output_text", text: "hello world" }],
+            },
+          ],
+        },
+      },
+    ], {
+      onBlockStart(type) { blockStarts.push(type); },
+      onText(chunk) { textChunks.push(chunk); },
+    });
+
+    expect(blockStarts).toEqual(["text"]);
+    expect(textChunks).toEqual(["hello", " world"]);
+    expect(result.blocks).toEqual([
+      { type: "text", text: "hello world" },
+    ]);
+  });
+
+  test("does not emit a synthetic suffix when the completed payload rewrites existing reasoning text", () => {
+    const blockStarts: Array<"text" | "thinking"> = [];
+    const thinkingChunks: string[] = [];
+    const result = readOpenAIEventsForTest([
+      {
+        type: "response.output_item.added",
+        output_index: 0,
+        item: { type: "reasoning", id: "rs_1" },
+      },
+      {
+        type: "response.reasoning_summary_part.added",
+        output_index: 0,
+        summary_index: 0,
+      },
+      {
+        type: "response.reasoning_summary_text.delta",
+        output_index: 0,
+        summary_index: 0,
+        delta: "partial",
+      },
+      {
+        type: "response.completed",
+        response: {
+          output: [
+            {
+              type: "reasoning",
+              id: "rs_1",
+              summary: [{ type: "summary_text", text: "final" }],
+            },
+          ],
+        },
+      },
+    ], {
+      onBlockStart(type) { blockStarts.push(type); },
+      onThinking(chunk) { thinkingChunks.push(chunk); },
+    });
+
+    expect(blockStarts).toEqual(["thinking"]);
+    expect(thinkingChunks).toEqual(["partial"]);
+    expect(result.blocks).toEqual([
+      { type: "thinking", text: "final", signature: "" },
+    ]);
   });
 
   test("starts a new thinking block when a new reasoning summary part begins", () => {
