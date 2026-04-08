@@ -76,22 +76,51 @@ function onDaemonEvent(event: Event): void {
     // the corresponding shadow individually.
   }
 
+  if (maybeFlushPendingAuthQueue()) return;
+
   scheduleRender();
 }
 
 // ── Input handling ──────────────────────────────────────────────────
 
-function showLoginRequiredPrompt(messageText?: string, images?: ImageAttachment[]): void {
-  if (messageText || images?.length) {
-    state.messages.push({ role: "user", text: messageText ?? "", images, metadata: null });
-  }
+function enqueuePendingAuthMessage(messageText: string, images?: ImageAttachment[]): void {
+  const echoStartedAt = Date.now();
+  state.pendingAuthQueue.push({ text: messageText, images, echoStartedAt });
+  state.messages.push({
+    role: "user",
+    text: messageText,
+    images,
+    metadata: { startedAt: echoStartedAt, endedAt: null, model: state.model, tokens: 0 },
+  });
+}
 
+function removePendingAuthEcho(echoStartedAt: number): void {
+  const idx = state.messages.findIndex((message) => (
+    message.role === "user"
+    && message.metadata?.startedAt === echoStartedAt
+  ));
+  if (idx !== -1) state.messages.splice(idx, 1);
+}
+
+function maybeFlushPendingAuthQueue(): boolean {
+  if (state.pendingAuthQueue.length === 0) return false;
+  if (isStreaming(state)) return false;
+  if (!state.authByProvider[state.provider]) return false;
+
+  const next = state.pendingAuthQueue.shift();
+  if (!next) return false;
+  removePendingAuthEcho(next.echoStartedAt);
+  sendDirectly(next.text, next.images);
+  return true;
+}
+
+function showLoginRequiredPrompt(): void {
   const options = loginPromptProviders(state)
     .map((provider) => `  /login ${provider}`)
     .join("\n");
   const msg = [
     state.hasChosenProvider ? `You're not authenticated for ${state.provider}.` : "You're not authenticated.",
-    "Sign in with:",
+    state.pendingAuthQueue.length > 0 ? "Sign in to send the queued message:" : "Sign in with:",
     options,
   ].join("\n");
 
@@ -182,7 +211,8 @@ function handleSubmit(): void {
     clearPrompt(state);
     state.pendingImages = [];
     state.scrollOffset = 0;
-    showLoginRequiredPrompt(messageText, images);
+    enqueuePendingAuthMessage(messageText, images);
+    showLoginRequiredPrompt();
     scheduleRender();
     return;
   }
@@ -196,7 +226,8 @@ function handleSubmit(): void {
 /** Send a message immediately (no streaming in progress). */
 function sendDirectly(messageText: string, images?: ImageAttachment[]): void {
   if (!state.authByProvider[state.provider]) {
-    showLoginRequiredPrompt(messageText, images);
+    enqueuePendingAuthMessage(messageText, images);
+    showLoginRequiredPrompt();
     scheduleRender();
     return;
   }

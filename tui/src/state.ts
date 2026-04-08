@@ -40,6 +40,12 @@ export interface QueuePromptState {
   images?: ImageAttachment[];
 }
 
+export interface AuthQueuedMessage {
+  text: string;
+  images?: ImageAttachment[];
+  echoStartedAt: number;
+}
+
 // ── Edit message modal types ──────────────────────────────────────
 
 /** Sentinel index for system instructions in the edit message modal. */
@@ -104,6 +110,8 @@ export interface RenderState {
   layout: LayoutCache;
   /** Pending message to send after conversation is created. */
   pendingSend: { active: boolean; text: string; images?: ImageAttachment[] };
+  /** Messages blocked on login; auto-sent after successful authentication. */
+  pendingAuthQueue: AuthQueuedMessage[];
   /** Pending system instructions to apply after a conversation is created. */
   pendingSystemInstructions: string | null;
   /** Whether a just-created conversation should auto-generate its title. */
@@ -239,6 +247,7 @@ export function createInitialState(): RenderState {
     vim: createVimState(),
     layout: { totalLines: 0, messageAreaHeight: 0, chatCol: 1, sepAbove: 0, firstInputRow: 0, sepBelow: 0 },
     pendingSend: { active: false, text: "" },
+    pendingAuthQueue: [],
     pendingSystemInstructions: null,
     pendingGenerateTitleOnCreate: false,
     systemMessageBuffer: [],
