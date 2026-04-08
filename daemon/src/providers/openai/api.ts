@@ -2,7 +2,8 @@ import type { ApiMessage, ModelId } from "../../messages";
 import { createAbortError, isAbortLikeError } from "../../abort";
 import { getVerifiedSession } from "./auth";
 import { AuthError } from "../errors";
-import { OPENAI_CODEX_RESPONSES_URL, OPENAI_ORIGINATOR } from "./constants";
+import { OPENAI_CODEX_RESPONSES_URL } from "./constants";
+import { buildOpenAIRequestHeaders, type OpenAIRequestSession } from "./cache";
 import { buildOpenAIInput, buildRequestBody } from "./request";
 import { mergeReasoningSummaries } from "./reasoning";
 import { readOpenAIEventsForTest, readOpenAIStream } from "./stream";
@@ -13,34 +14,6 @@ export { AuthError, mergeReasoningSummaries as mergeReasoningSummariesForTest, r
 const STREAM_STALL_TIMEOUT = 120_000;
 const MAX_RETRIES = 8;
 
-type OpenAISession = { accessToken: string; accountId: string | null };
-
-function buildOpenAIRequestHeaders(
-  session: OpenAISession,
-  options: StreamOptions,
-): Record<string, string> {
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${session.accessToken}`,
-    Accept: "text/event-stream",
-    "Content-Type": "application/json",
-    originator: OPENAI_ORIGINATOR,
-    "User-Agent": "exocortexd/openai",
-  };
-
-  // Match the official Codex client: when a stable prompt cache key is present,
-  // also send the same conversation identity in headers. This keeps the request
-  // shape aligned with the backend's expected conversation/cache routing signals.
-  if (options.promptCacheKey) {
-    headers.session_id = options.promptCacheKey;
-    headers["x-client-request-id"] = options.promptCacheKey;
-  }
-
-  if (session.accountId) {
-    headers["ChatGPT-Account-ID"] = session.accountId;
-  }
-
-  return headers;
-}
 
 function retryBackoff(
   attempt: number,
@@ -92,7 +65,7 @@ export function buildRequestBodyForTest(
  * behavior without depending on auth state.
  */
 export async function streamMessageWithSession(
-  session: OpenAISession,
+  session: OpenAIRequestSession,
   messages: ApiMessage[],
   model: ModelId,
   callbacks: StreamCallbacks,

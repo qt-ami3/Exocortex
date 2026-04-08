@@ -1,5 +1,6 @@
 import type { ApiMessage, ApiContentBlock, ModelId, EffortLevel } from "../../messages";
 import type { StreamOptions } from "../types";
+import { buildPromptCacheBodyFields } from "./cache";
 import type { OpenAIReasoningItem } from "./types";
 
 export type OpenAIInputItem =
@@ -231,6 +232,6 @@ export function buildRequestBody(
     input,
     stream: true,
     store: false,
-    ...(options.promptCacheKey ? { prompt_cache_key: options.promptCacheKey } : {}),
+    ...buildPromptCacheBodyFields(options),
   };
 }
