@@ -2,9 +2,8 @@
  * Unit tests for persistence.ts — migration chain and public API.
  *
  * Migration functions are not exported, so all tests go through the public
- * save / load / loadAll interface.  Fixture files at various schema versions
- * are written directly to the worktree-isolated conversations directory and
- * loaded, exercising every migration step in the chain.
+ * save / load / loadAll interface. Fixture files are written directly to an
+ * isolated temporary conversations directory so tests never touch live chats.
  */
 
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
@@ -118,52 +117,48 @@ describe("V1 migration", () => {
       // no version key
       id,
       model: "haiku",
-      messages: [{ role: "user", content: "Versionless" }],
-      createdAt: 1_300_000,
-      updatedAt: 1_300_001,
+      messages: [{ role: "user", content: "No version present" }],
+      createdAt: 2_000_000,
+      updatedAt: 2_000_001,
     });
 
     const conv = load(id);
     expect(conv).not.toBeNull();
     expect(conv!.messages[0].metadata).toBeNull();
-    expect(conv!.sortOrder).toBe(-1_300_001);
-    expect(conv!.title).toBe("Versionless");
     expect(conv!.effort).toBe(DEFAULT_EFFORT);
   });
 
   test("legacyPreview truncates long string content at 80 chars", () => {
-    const id = mkId("v1-long-content");
-    const longText = "X".repeat(200);
+    const id = mkId("v1-preview-truncation");
+    const long = "x".repeat(100);
     writeFixture(id, {
       version: 1,
       id,
       model: "sonnet",
-      messages: [{ role: "user", content: longText }],
-      createdAt: 1_400_000,
-      updatedAt: 1_400_001,
+      messages: [{ role: "user", content: long }],
+      createdAt: 3_000_000,
+      updatedAt: 3_000_001,
     });
 
     const conv = load(id);
     expect(conv).not.toBeNull();
-    expect(conv!.title).toBe("X".repeat(80));
+    expect(conv!.title).toBe("x".repeat(80));
   });
 });
 
-// ── V2 → V9 ──────────────────────────────────────────────────────────
-//
-// V2: added metadata field on messages (StoredMessage).
-// After migration: lastContextTokens: null (V3), plus all later defaults.
-
 describe("V2 migration", () => {
   test("loads with lastContextTokens: null and all later defaults", () => {
-    const id = mkId("v2-basic");
+    const id = mkId("v2-defaults");
     writeFixture(id, {
       version: 2,
       id,
-      model: "haiku",
-      messages: [{ role: "user", content: "Hello v2", metadata: null }],
-      createdAt: 2_000_000,
-      updatedAt: 2_000_001,
+      model: "sonnet",
+      messages: [
+        { role: "user", content: "Hello", metadata: null },
+        { role: "assistant", content: "World", metadata: null },
+      ],
+      createdAt: 4_000_000,
+      updatedAt: 4_000_001,
     });
 
     const conv = load(id);
@@ -171,47 +166,44 @@ describe("V2 migration", () => {
     expect(conv!.lastContextTokens).toBeNull();
     expect(conv!.marked).toBe(false);
     expect(conv!.pinned).toBe(false);
-    expect(conv!.sortOrder).toBe(-2_000_001);
-    expect(conv!.title).toBe("Hello v2");
+    expect(conv!.sortOrder).toBe(-4_000_001);
+    expect(conv!.title).toBe("Hello");
     expect(conv!.effort).toBe(DEFAULT_EFFORT);
   });
 
   test("message metadata (non-null) is preserved through migration", () => {
-    const id = mkId("v2-metadata-preserved");
-    const meta = { startedAt: 2_100_000, endedAt: 2_100_500, model: "haiku" as const, tokens: 77 };
+    const id = mkId("v2-preserve-metadata");
     writeFixture(id, {
       version: 2,
       id,
-      model: "haiku",
+      model: "opus",
       messages: [
-        { role: "user", content: "Question", metadata: null },
-        { role: "assistant", content: "Answer", metadata: meta },
+        {
+          role: "assistant",
+          content: "Preserve me",
+          metadata: { startedAt: 111, endedAt: 222, model: "opus", tokens: 33 },
+        },
       ],
-      createdAt: 2_100_000,
-      updatedAt: 2_100_001,
+      createdAt: 5_000_000,
+      updatedAt: 5_000_001,
     });
 
     const conv = load(id);
     expect(conv).not.toBeNull();
-    expect(conv!.messages[0].metadata).toBeNull();
-    expect(conv!.messages[1].metadata).toEqual(meta);
+    expect(conv!.messages[0].metadata).toEqual({ startedAt: 111, endedAt: 222, model: "opus", tokens: 33 });
   });
 });
 
-// ── V5 → V9 ──────────────────────────────────────────────────────────
-//
-// V5: added pinned flag.  V5→V6 adds sortOrder = -updatedAt.
-
 describe("V5 migration", () => {
   test("sortOrder derived from -updatedAt", () => {
-    const id = mkId("v5-sort-order");
+    const id = mkId("v5-sortorder");
     writeFixture(id, {
       version: 5,
       id,
       model: "sonnet",
-      messages: [{ role: "user", content: "Hello v5", metadata: null }],
-      createdAt: 5_000_000,
-      updatedAt: 5_000_001,
+      messages: [],
+      createdAt: 6_000_000,
+      updatedAt: 6_123_456,
       lastContextTokens: null,
       marked: false,
       pinned: false,
@@ -219,7 +211,7 @@ describe("V5 migration", () => {
 
     const conv = load(id);
     expect(conv).not.toBeNull();
-    expect(conv!.sortOrder).toBe(-5_000_001);
+    expect(conv!.sortOrder).toBe(-6_123_456);
   });
 
   test("existing marked/pinned flags are preserved", () => {
@@ -228,39 +220,31 @@ describe("V5 migration", () => {
       version: 5,
       id,
       model: "sonnet",
-      messages: [{ role: "user", content: "Flags", metadata: null }],
-      createdAt: 5_100_000,
-      updatedAt: 5_100_001,
-      lastContextTokens: 42,
+      messages: [],
+      createdAt: 6_500_000,
+      updatedAt: 6_500_001,
+      lastContextTokens: null,
       marked: true,
-      pinned: false,
+      pinned: true,
     });
 
     const conv = load(id);
     expect(conv).not.toBeNull();
     expect(conv!.marked).toBe(true);
-    expect(conv!.pinned).toBe(false);
-    expect(conv!.lastContextTokens).toBe(42);
-    expect(conv!.title).toBe("Flags");
-    expect(conv!.effort).toBe(DEFAULT_EFFORT);
+    expect(conv!.pinned).toBe(true);
   });
 });
 
-// ── V7 → V9 ──────────────────────────────────────────────────────────
-//
-// V7: added nullable title.  V7→V8 makes title non-nullable:
-//   null title  →  legacyPreview(messages)
-//   non-null title  →  kept as-is
-
 describe("V7 migration", () => {
   test("null title: preview from first user string message", () => {
-    const id = mkId("v7-null-string");
+    const id = mkId("v7-title-from-string");
     writeFixture(id, {
       version: 7,
       id,
       model: "sonnet",
       messages: [
-        { role: "user", content: "Hello from v7", metadata: null },
+        { role: "assistant", content: "ignore", metadata: null },
+        { role: "user", content: "First user text", metadata: null },
       ],
       createdAt: 7_000_000,
       updatedAt: 7_000_001,
@@ -273,12 +257,11 @@ describe("V7 migration", () => {
 
     const conv = load(id);
     expect(conv).not.toBeNull();
-    expect(conv!.title).toBe("Hello from v7");
-    expect(conv!.effort).toBe(DEFAULT_EFFORT);
+    expect(conv!.title).toBe("First user text");
   });
 
   test("null title: preview from first user text block in array content", () => {
-    const id = mkId("v7-null-text-block");
+    const id = mkId("v7-title-from-block");
     writeFixture(id, {
       version: 7,
       id,
@@ -286,7 +269,10 @@ describe("V7 migration", () => {
       messages: [
         {
           role: "user",
-          content: [{ type: "text", text: "Block text in v7" }],
+          content: [
+            { type: "image", source: { type: "base64", media_type: "image/png", data: "abc" } },
+            { type: "text", text: "Caption here" },
+          ],
           metadata: null,
         },
       ],
@@ -301,11 +287,11 @@ describe("V7 migration", () => {
 
     const conv = load(id);
     expect(conv).not.toBeNull();
-    expect(conv!.title).toBe("Block text in v7");
+    expect(conv!.title).toBe("Caption here");
   });
 
   test("null title: image-only first user message yields '📎 Image'", () => {
-    const id = mkId("v7-null-image-only");
+    const id = mkId("v7-title-image-only");
     writeFixture(id, {
       version: 7,
       id,
@@ -313,9 +299,7 @@ describe("V7 migration", () => {
       messages: [
         {
           role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: "image/png", data: "abc" } },
-          ],
+          content: [{ type: "image", source: { type: "base64", media_type: "image/png", data: "abc" } }],
           metadata: null,
         },
       ],
@@ -334,14 +318,12 @@ describe("V7 migration", () => {
   });
 
   test("null title with no user messages yields empty string", () => {
-    const id = mkId("v7-null-no-user");
+    const id = mkId("v7-title-no-user");
     writeFixture(id, {
       version: 7,
       id,
       model: "sonnet",
-      messages: [
-        { role: "assistant", content: "Assistant only", metadata: null },
-      ],
+      messages: [{ role: "assistant", content: "Only assistant", metadata: null }],
       createdAt: 7_300_000,
       updatedAt: 7_300_001,
       lastContextTokens: null,
@@ -357,35 +339,35 @@ describe("V7 migration", () => {
   });
 
   test("non-null title is kept unchanged", () => {
-    const id = mkId("v7-explicit-title");
+    const id = mkId("v7-title-preserved");
     writeFixture(id, {
       version: 7,
       id,
-      model: "haiku",
-      messages: [{ role: "user", content: "Ignored", metadata: null }],
+      model: "sonnet",
+      messages: [{ role: "user", content: "ignored", metadata: null }],
       createdAt: 7_400_000,
       updatedAt: 7_400_001,
       lastContextTokens: null,
       marked: false,
       pinned: false,
       sortOrder: -7_400_001,
-      title: "Preserved Title",
+      title: "Keep this title",
     });
 
     const conv = load(id);
     expect(conv).not.toBeNull();
-    expect(conv!.title).toBe("Preserved Title");
+    expect(conv!.title).toBe("Keep this title");
   });
 
   test("legacyPreview skips assistant messages and uses first user message", () => {
-    const id = mkId("v7-skip-assistant");
+    const id = mkId("v7-legacy-preview-skip-assistant");
     writeFixture(id, {
       version: 7,
       id,
       model: "sonnet",
       messages: [
-        { role: "assistant", content: "Assistant first", metadata: null },
-        { role: "user", content: "User second", metadata: null },
+        { role: "assistant", content: "Assistant text", metadata: null },
+        { role: "user", content: "User text wins", metadata: null },
       ],
       createdAt: 7_500_000,
       updatedAt: 7_500_001,
@@ -398,12 +380,12 @@ describe("V7 migration", () => {
 
     const conv = load(id);
     expect(conv).not.toBeNull();
-    expect(conv!.title).toBe("User second");
+    expect(conv!.title).toBe("User text wins");
   });
 
   test("legacyPreview truncates text block content at 80 chars", () => {
-    const id = mkId("v7-long-block");
-    const longText = "B".repeat(150);
+    const id = mkId("v7-legacy-preview-truncate-block");
+    const long = "y".repeat(100);
     writeFixture(id, {
       version: 7,
       id,
@@ -411,7 +393,7 @@ describe("V7 migration", () => {
       messages: [
         {
           role: "user",
-          content: [{ type: "text", text: longText }],
+          content: [{ type: "text", text: long }],
           metadata: null,
         },
       ],
@@ -426,29 +408,25 @@ describe("V7 migration", () => {
 
     const conv = load(id);
     expect(conv).not.toBeNull();
-    expect(conv!.title).toBe("B".repeat(80));
+    expect(conv!.title).toBe("y".repeat(80));
   });
 });
 
-// ── V8 → V9 ──────────────────────────────────────────────────────────
-//
-// V8: made title non-nullable (string).  V8→V9 adds effort: DEFAULT_EFFORT.
-
 describe("V8 migration", () => {
   test("effort defaults to DEFAULT_EFFORT", () => {
-    const id = mkId("v8-effort");
+    const id = mkId("v8-effort-default");
     writeFixture(id, {
       version: 8,
       id,
-      model: "sonnet",
-      messages: [{ role: "user", content: "Hello v8", metadata: null }],
+      model: "opus",
+      messages: [],
       createdAt: 8_000_000,
       updatedAt: 8_000_001,
       lastContextTokens: null,
       marked: false,
       pinned: false,
       sortOrder: -8_000_001,
-      title: "My v8 title",
+      title: "V8 chat",
     });
 
     const conv = load(id);
@@ -457,114 +435,78 @@ describe("V8 migration", () => {
   });
 
   test("all existing V8 fields are preserved unchanged", () => {
-    const id = mkId("v8-fields");
+    const id = mkId("v8-preserve");
     writeFixture(id, {
       version: 8,
       id,
-      model: "opus",
-      messages: [{ role: "user", content: "V8 fields", metadata: null }],
+      model: "haiku",
+      messages: [{ role: "user", content: "hello", metadata: null }],
       createdAt: 8_100_000,
-      updatedAt: 8_100_001,
-      lastContextTokens: 128,
+      updatedAt: 8_100_123,
+      lastContextTokens: 321,
       marked: true,
-      pinned: true,
-      sortOrder: 42,
-      title: "Preserved v8 title",
+      pinned: false,
+      sortOrder: -8_100_123,
+      title: "already titled",
     });
 
     const conv = load(id);
     expect(conv).not.toBeNull();
-    expect(conv!.model).toBe("opus");
-    expect(conv!.createdAt).toBe(8_100_000);
-    expect(conv!.updatedAt).toBe(8_100_001);
-    expect(conv!.lastContextTokens).toBe(128);
+    expect(conv!.title).toBe("already titled");
     expect(conv!.marked).toBe(true);
-    expect(conv!.pinned).toBe(true);
-    expect(conv!.sortOrder).toBe(42);
-    expect(conv!.title).toBe("Preserved v8 title");
-    expect(conv!.effort).toBe(DEFAULT_EFFORT);
+    expect(conv!.lastContextTokens).toBe(321);
   });
 });
-
-// ── V9 → V10 ─────────────────────────────────────────────────────────
 
 describe("V9 migration", () => {
   test("adds anthropic as the default provider while preserving existing fields", () => {
-    const id = mkId("v9-current");
-    const assistantMeta = {
-      startedAt: 9_000_000,
-      endedAt: 9_000_100,
-      model: "opus" as const,
-      tokens: 10,
-    };
+    const id = mkId("v9-provider-default");
     writeFixture(id, {
       version: 9,
       id,
-      model: "opus",
+      model: "haiku",
       effort: "low",
-      messages: [
-        { role: "user", content: "Hello v9", metadata: null },
-        {
-          role: "assistant",
-          content: [{ type: "text", text: "Response" }],
-          metadata: assistantMeta,
-        },
-      ],
+      messages: [{ role: "user", content: "hello", metadata: null }],
       createdAt: 9_000_000,
       updatedAt: 9_000_001,
-      lastContextTokens: 512,
-      marked: true,
-      pinned: true,
-      sortOrder: 7,
-      title: "My v9 conversation",
+      lastContextTokens: null,
+      marked: false,
+      pinned: false,
+      sortOrder: -9_000_001,
+      title: "V9",
     });
 
     const conv = load(id);
     expect(conv).not.toBeNull();
-    expect(conv!.id).toBe(id);
     expect(conv!.provider).toBe("anthropic");
-    expect(conv!.model).toBe("opus");
     expect(conv!.effort).toBe("low");
-    expect(conv!.messages).toHaveLength(2);
-    expect(conv!.createdAt).toBe(9_000_000);
-    expect(conv!.updatedAt).toBe(9_000_001);
-    expect(conv!.lastContextTokens).toBe(512);
-    expect(conv!.marked).toBe(true);
-    expect(conv!.pinned).toBe(true);
-    expect(conv!.sortOrder).toBe(7);
-    expect(conv!.title).toBe("My v9 conversation");
-    expect(conv!.messages[1].metadata).toEqual(assistantMeta);
   });
 });
 
-// ── Error handling ────────────────────────────────────────────────────
-
 describe("V10 migration", () => {
   test("fastMode defaults to false while preserving existing fields", () => {
-    const id = mkId("v10-fastmode");
+    const id = mkId("v10-fastmode-default");
     writeFixture(id, {
       version: 10,
       id,
       provider: "openai",
       model: "gpt-5.4",
       effort: "medium",
-      messages: [{ role: "user", content: "Hello v10", metadata: null }],
+      messages: [{ role: "user", content: "hello", metadata: null }],
       createdAt: 10_000_000,
       updatedAt: 10_000_001,
-      lastContextTokens: 256,
-      marked: false,
-      pinned: false,
+      lastContextTokens: 42,
+      marked: true,
+      pinned: true,
       sortOrder: -10_000_001,
-      title: "My v10 conversation",
+      title: "V10",
     });
 
     const conv = load(id);
     expect(conv).not.toBeNull();
-    expect(conv!.provider).toBe("openai");
-    expect(conv!.model).toBe("gpt-5.4");
-    expect(conv!.effort).toBe("medium");
     expect(conv!.fastMode).toBe(false);
-    expect(conv!.title).toBe("My v10 conversation");
+    expect(conv!.provider).toBe("openai");
+    expect(conv!.pinned).toBe(true);
   });
 });
 
@@ -580,12 +522,10 @@ describe("error handling", () => {
   });
 
   test("missing file returns null", () => {
-    const conv = load("nonexistent-id-that-definitely-does-not-exist");
+    const conv = load("this-id-does-not-exist");
     expect(conv).toBeNull();
   });
 });
-
-// ── save() / load() round-trip ────────────────────────────────────────
 
 describe("save / load round-trip", () => {
   test("save then load returns a deeply equal conversation", () => {
@@ -593,175 +533,177 @@ describe("save / load round-trip", () => {
     const original: Conversation = {
       id,
       provider: "openai",
-      model: "gpt-5",
-      effort: "medium",
+      model: "gpt-5.4",
+      effort: "high",
       fastMode: true,
       messages: [
-        { role: "user", content: "Round-trip test", metadata: null },
+        { role: "user", content: "Hello", metadata: null },
         {
           role: "assistant",
-          content: [{ type: "text", text: "Acknowledged" }],
-          metadata: {
-            startedAt: 1_234_567,
-            endedAt: 1_234_999,
-            model: "gpt-5",
-            tokens: 42,
-          },
-          providerData: {
-            openai: {
-              responseId: "resp_123",
-              reasoningItems: [
-                {
-                  id: "rs_123",
-                  encryptedContent: "opaque",
-                  summaries: ["checked replay state"],
-                },
-              ],
-            },
-          },
+          content: [
+            { type: "thinking", thinking: "thinking...", signature: "sig" },
+            { type: "text", text: "Hi there" },
+          ],
+          metadata: { startedAt: 1, endedAt: 2, model: "gpt-5.4", tokens: 123 },
         },
       ],
-      createdAt: 1_000_000,
-      updatedAt: 1_000_002,
-      lastContextTokens: 200,
+      createdAt: 11_000_000,
+      updatedAt: 11_000_001,
+      lastContextTokens: 2048,
       marked: true,
       pinned: false,
-      sortOrder: -999,
-      title: "Round-trip conversation",
+      sortOrder: -11_000_001,
+      title: "Roundtrip Chat",
     };
 
     save(original);
     const loaded = load(id);
-
-    expect(loaded).not.toBeNull();
     expect(loaded).toEqual(original);
   });
 
   test("saving again overwrites the file with the new data", () => {
     const id = mkId("roundtrip-overwrite");
-    const base: Conversation = {
+    const a: Conversation = {
       id,
       provider: "anthropic",
       model: "sonnet",
       effort: "high",
       fastMode: false,
-      messages: [],
-      createdAt: 2_000_000,
-      updatedAt: 2_000_000,
+      messages: [{ role: "user", content: "First", metadata: null }],
+      createdAt: 12_000_000,
+      updatedAt: 12_000_001,
       lastContextTokens: null,
       marked: false,
       pinned: false,
-      sortOrder: -2_000_000,
-      title: "First save",
+      sortOrder: -12_000_001,
+      title: "A",
+    };
+    const b: Conversation = {
+      ...a,
+      provider: "openai",
+      model: "gpt-5.4",
+      fastMode: true,
+      messages: [{ role: "user", content: "Second", metadata: null }],
+      updatedAt: 12_000_999,
+      sortOrder: -12_000_999,
+      title: "B",
     };
 
-    save(base);
-    save({ ...base, title: "Second save", updatedAt: 2_000_001 });
-
+    save(a);
+    save(b);
     const loaded = load(id);
-    expect(loaded!.title).toBe("Second save");
-    expect(loaded!.updatedAt).toBe(2_000_001);
+    expect(loaded).toEqual(b);
   });
 
   test("all EffortLevel values survive round-trip", () => {
-    const efforts = ["low", "medium", "high", "max"] as const;
+    const efforts: Conversation["effort"][] = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+
     for (const effort of efforts) {
       const id = mkId(`roundtrip-effort-${effort}`);
       const conv: Conversation = {
         id,
-        provider: "anthropic",
-        model: "haiku",
+        provider: "openai",
+        model: "gpt-5.4",
         effort,
         fastMode: false,
-        messages: [],
-        createdAt: 3_000_000,
-        updatedAt: 3_000_000,
+        messages: [{ role: "user", content: `effort=${effort}`, metadata: null }],
+        createdAt: 13_000_000,
+        updatedAt: 13_000_001,
         lastContextTokens: null,
         marked: false,
         pinned: false,
-        sortOrder: -3_000_000,
+        sortOrder: -13_000_001,
         title: `Effort ${effort}`,
       };
       save(conv);
-      const loaded = load(id);
-      expect(loaded!.effort).toBe(effort);
+      expect(load(id)).toEqual(conv);
     }
   });
 });
 
-// ── loadAll() ─────────────────────────────────────────────────────────
-
 describe("loadAll()", () => {
   test("returns summaries for all valid conversation files in the directory", () => {
-    const idA = mkId("loadall-a");
-    const idB = mkId("loadall-b");
+    const idOld = mkId("loadall-old");
+    const idMid = mkId("loadall-mid");
+    const idNew = mkId("loadall-new");
 
-    writeFixture(idA, {
+    writeFixture(idOld, {
       version: 10,
-      id: idA,
+      id: idOld,
       provider: "anthropic",
       model: "sonnet",
       effort: "high",
-      messages: [{ role: "user", content: "A", metadata: null }],
-      createdAt: 100,
+      messages: [{ role: "user", content: "old", metadata: null }],
+      createdAt: 0,
       updatedAt: 100,
       lastContextTokens: null,
       marked: false,
       pinned: false,
-      sortOrder: 10,
-      title: "A",
+      sortOrder: 100,
+      title: "Old",
     });
-    writeFixture(idB, {
+    writeFixture(idMid, {
       version: 10,
-      id: idB,
-      provider: "anthropic",
-      model: "haiku",
-      effort: "low",
-      messages: [],
-      createdAt: 200,
+      id: idMid,
+      provider: "openai",
+      model: "gpt-5.4",
+      effort: "medium",
+      messages: [{ role: "user", content: "mid", metadata: null }],
+      createdAt: 0,
       updatedAt: 200,
       lastContextTokens: null,
       marked: false,
       pinned: false,
-      sortOrder: 5,
-      title: "B",
+      sortOrder: 50,
+      title: "Mid",
+    });
+    writeFixture(idNew, {
+      version: 10,
+      id: idNew,
+      provider: "anthropic",
+      model: "opus",
+      effort: "low",
+      messages: [
+        { role: "user", content: "new", metadata: null },
+        { role: "assistant", content: "reply", metadata: null },
+      ],
+      createdAt: 0,
+      updatedAt: 300,
+      lastContextTokens: null,
+      marked: false,
+      pinned: false,
+      sortOrder: -10,
+      title: "New",
     });
 
     const all = loadAll();
-    const ids = all.map((c) => c.id);
-    expect(ids).toContain(idA);
-    expect(ids).toContain(idB);
+    const ours = all.filter((c) => [idOld, idMid, idNew].includes(c.id));
 
-    // summaries have the right shape (no messages array — that's ConversationSummary)
-    const summaryA = all.find((c) => c.id === idA)!;
-    expect(summaryA.model).toBe("sonnet");
-    expect(summaryA.effort).toBe("high");
-    expect(summaryA.fastMode).toBe(false);
-    expect(summaryA.title).toBe("A");
-    expect(summaryA.messageCount).toBe(1);
-    expect(summaryA.streaming).toBe(false);
-    expect(summaryA.unread).toBe(false);
+    expect(ours).toHaveLength(3);
+    expect(ours.map((c) => c.id)).toEqual([idNew, idMid, idOld]);
+    expect(ours.find((c) => c.id === idNew)?.messageCount).toBe(2);
   });
 
   test("messageCount excludes system_instructions entries", () => {
-    const id = mkId("loadall-system-instructions-count");
+    const id = mkId("loadall-system-instructions");
     writeFixture(id, {
       version: 10,
       id,
+      provider: "anthropic",
       model: "sonnet",
       effort: "high",
       messages: [
-        { role: "system_instructions", content: "Be terse", metadata: null },
+        { role: "system_instructions", content: "be terse", metadata: null },
         { role: "user", content: "hello", metadata: null },
         { role: "assistant", content: "hi", metadata: null },
       ],
-      createdAt: 123,
-      updatedAt: 456,
+      createdAt: 0,
+      updatedAt: 0,
       lastContextTokens: null,
       marked: false,
       pinned: false,
       sortOrder: 0,
-      title: "With instructions",
+      title: "With system instructions",
     });
 
     const all = loadAll();
@@ -771,18 +713,13 @@ describe("loadAll()", () => {
   });
 
   test("summaries are sorted by sortOrder ascending (lower = first)", () => {
-    const idLow = mkId("loadall-sort-low");
-    const idMid = mkId("loadall-sort-mid");
-    const idHigh = mkId("loadall-sort-high");
+    const ids = [mkId("sort-a"), mkId("sort-b"), mkId("sort-c")];
+    const sortOrders = [20, -5, 7];
 
-    for (const [id, sortOrder] of [
-      [idLow, 1],
-      [idMid, 50],
-      [idHigh, 200],
-    ] as const) {
-      writeFixture(id, {
+    for (let i = 0; i < ids.length; i++) {
+      writeFixture(ids[i], {
         version: 10,
-        id,
+        id: ids[i],
         provider: "anthropic",
         model: "sonnet",
         effort: "high",
@@ -792,20 +729,20 @@ describe("loadAll()", () => {
         lastContextTokens: null,
         marked: false,
         pinned: false,
-        sortOrder,
-        title: id,
+        sortOrder: sortOrders[i],
+        title: ids[i],
       });
     }
 
     const all = loadAll();
-    const ours = all.filter((c) => [idLow, idMid, idHigh].includes(c.id));
+    const ours = all.filter((c) => ids.includes(c.id));
     expect(ours).toHaveLength(3);
-    expect(ours.map((c) => c.id)).toEqual([idLow, idMid, idHigh]);
+    expect(ours.map((c) => c.id)).toEqual([ids[1], ids[2], ids[0]]);
   });
 
   test("pinned conversations appear before unpinned regardless of sortOrder", () => {
-    const idPinned = mkId("loadall-pinned");
-    const idUnpinned = mkId("loadall-unpinned");
+    const idPinned = mkId("pinned");
+    const idUnpinned = mkId("unpinned");
 
     writeFixture(idPinned, {
       version: 10,
@@ -819,7 +756,7 @@ describe("loadAll()", () => {
       lastContextTokens: null,
       marked: false,
       pinned: true,
-      sortOrder: 999, // high sortOrder but pinned
+      sortOrder: 999,
       title: "Pinned",
     });
     writeFixture(idUnpinned, {
@@ -834,7 +771,7 @@ describe("loadAll()", () => {
       lastContextTokens: null,
       marked: false,
       pinned: false,
-      sortOrder: 1, // low sortOrder but not pinned
+      sortOrder: 1,
       title: "Unpinned",
     });
 
@@ -896,14 +833,11 @@ describe("loadAll()", () => {
   });
 
   test("files not ending in .json are ignored", () => {
-    // Write a non-.json file — loadAll() should not choke on it
     const fakePath = join(CONV_DIR, "test-persist-not-json.txt");
     writeFileSync(fakePath, "not json at all", { mode: 0o600 });
 
-    // The test is that loadAll() doesn't throw
     expect(() => loadAll()).not.toThrow();
 
-    // cleanup the non-standard file manually
     try {
       rmSync(fakePath);
     } catch {

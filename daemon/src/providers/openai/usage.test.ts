@@ -1,14 +1,8 @@
-import { afterAll, afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, rmSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdirSync, rmSync } from "fs";
+import { dataDir, runtimeDir } from "@exocortex/shared/paths";
+import { clearUsage, handleUsageHeaders } from "./usage";
 import type { UsageData } from "../../messages";
-
-const TEST_CONFIG_DIR = mkdtempSync(join(tmpdir(), "exocortex-usage-test-"));
-process.env.EXOCORTEX_CONFIG_DIR = TEST_CONFIG_DIR;
-
-const { dataDir, runtimeDir } = await import("@exocortex/shared/paths");
-const { clearUsage, handleUsageHeaders } = await import("./usage");
 
 function resetUsageStorage(): void {
   rmSync(runtimeDir(), { recursive: true, force: true });
@@ -20,11 +14,6 @@ function resetUsageStorage(): void {
 afterEach(() => {
   clearUsage();
   resetUsageStorage();
-});
-
-afterAll(() => {
-  delete process.env.EXOCORTEX_CONFIG_DIR;
-  rmSync(TEST_CONFIG_DIR, { recursive: true, force: true });
 });
 
 describe("OpenAI usage header parsing", () => {
