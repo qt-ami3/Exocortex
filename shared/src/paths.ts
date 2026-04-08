@@ -4,6 +4,8 @@
  * All paths are resolved relative to the repo root, detected from
  * the source file's own location via import.meta.dir. This means
  * everything works regardless of CWD or where the repo is moved to.
+ * Tests can override the config root via EXOCORTEX_CONFIG_DIR; using
+ * the live repo config during tests is rejected unless explicitly allowed.
  *
  * Directory layout under <repo>/config/:
  *
@@ -44,7 +46,26 @@ function detectRepoRoot(): string {
 }
 
 const REPO_ROOT = detectRepoRoot();
-const CONFIG_DIR = join(REPO_ROOT, "config");
+const DEFAULT_CONFIG_DIR = join(REPO_ROOT, "config");
+const CONFIG_DIR = process.env.EXOCORTEX_CONFIG_DIR?.trim()
+  ? resolve(process.env.EXOCORTEX_CONFIG_DIR)
+  : DEFAULT_CONFIG_DIR;
+
+function isTestProcess(): boolean {
+  return process.env.NODE_ENV === "test" || process.env.EXOCORTEX_TEST === "1";
+}
+
+if (
+  isTestProcess()
+  && resolve(CONFIG_DIR) === resolve(DEFAULT_CONFIG_DIR)
+  && process.env.EXOCORTEX_ALLOW_LIVE_CONFIG_IN_TESTS !== "1"
+) {
+  throw new Error(
+    "Refusing to use the live Exocortex config directory during tests. " +
+    "Set EXOCORTEX_CONFIG_DIR to an isolated temp dir, or set " +
+    "EXOCORTEX_ALLOW_LIVE_CONFIG_IN_TESTS=1 for intentional debugging."
+  );
+}
 
 // ── Worktree detection ──────────────────────────────────────────────
 

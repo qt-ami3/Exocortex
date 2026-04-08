@@ -15,9 +15,6 @@ interface OpenAIReadState {
   inputTokens?: number;
   outputTokens?: number;
   stopReason: string;
-  fullText: string;
-  fullThinking: { value: string };
-  blocks: ContentBlock[];
   toolCalls: ApiToolCall[];
   textStarted: Set<string>;
   textStates: Map<number, string>;
@@ -34,9 +31,6 @@ interface OpenAIReadState {
 function createReadState(): OpenAIReadState {
   return {
     stopReason: "",
-    fullText: "",
-    fullThinking: { value: "" },
-    blocks: [],
     toolCalls: [],
     textStarted: new Set<string>(),
     textStates: new Map<number, string>(),
@@ -162,6 +156,59 @@ function handleCompletedReasoningItem(state: OpenAIReadState, item: Record<strin
   state.reasoningOutputIndexesById.set(reasoningItem.id, outputIndex);
 }
 
+function buildOrderedBlocks(state: OpenAIReadState): ContentBlock[] {
+  const orderedReasoningEntries = [...state.reasoningStates.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .filter(([, item]) => hasRenderableReasoning(item));
+  const orderedTextEntries = [...state.textStates.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .filter(([, text]) => text.length > 0);
+  const orderedEntries = [
+    ...orderedReasoningEntries.map(([outputIndex, item]) => ({ outputIndex, kind: "reasoning" as const, item })),
+    ...orderedTextEntries.map(([outputIndex, text]) => ({ outputIndex, kind: "text" as const, text })),
+  ].sort((a, b) => a.outputIndex - b.outputIndex);
+
+  const orderedBlocks: ContentBlock[] = [];
+  for (const entry of orderedEntries) {
+    if (entry.kind === "reasoning") {
+      finalizeReasoningItem(entry.item, orderedBlocks, { value: "" });
+    } else {
+      orderedBlocks.push({ type: "text", text: entry.text });
+    }
+  }
+  return orderedBlocks;
+}
+
+/**
+ * Emit any append-only content that only became visible in the completed payload.
+ *
+ * OpenAI sometimes withholds the tail of a reasoning summary or assistant text
+ * until response.completed. The daemon's transient streaming snapshot must stay
+ * aligned with the final canonical blocks so refocus / late-join clients don't
+ * temporarily lose that tail until message_complete lands.
+ */
+function emitCompletedBackfill(before: ContentBlock[], after: ContentBlock[], cb: StreamCallbacks): void {
+  if (before.length > after.length) return;
+
+  for (let i = 0; i < before.length; i++) {
+    if (before[i].type !== after[i].type) return;
+    if (!after[i].text.startsWith(before[i].text)) return;
+  }
+
+  for (let i = 0; i < before.length; i++) {
+    const suffix = after[i].text.slice(before[i].text.length);
+    if (!suffix) continue;
+    if (after[i].type === "text") cb.onText(suffix);
+    else cb.onThinking(suffix);
+  }
+
+  for (let i = before.length; i < after.length; i++) {
+    cb.onBlockStart?.(after[i].type);
+    if (after[i].type === "text") cb.onText(after[i].text);
+    else cb.onThinking(after[i].text);
+  }
+}
+
 function handleStreamEvent(state: OpenAIReadState, event: Record<string, unknown>, cb: StreamCallbacks): void {
   switch (event.type) {
     case "response.created":
@@ -202,7 +249,6 @@ function handleStreamEvent(state: OpenAIReadState, event: Record<string, unknown
         cb.onBlockStart?.("text");
       }
       const delta = String(event.delta ?? "");
-      state.fullText += delta;
       if (outputIndex != null) {
         state.textStates.set(outputIndex, (state.textStates.get(outputIndex) ?? "") + delta);
       }
@@ -314,6 +360,7 @@ function handleStreamEvent(state: OpenAIReadState, event: Record<string, unknown
         incomplete_details?: { reason?: string };
         output?: Array<Record<string, unknown>>;
       } | undefined;
+      const blocksBeforeCompletion = buildOrderedBlocks(state);
       state.inputTokens = response?.usage?.input_tokens;
       state.outputTokens = response?.usage?.output_tokens;
       for (const item of response?.output ?? []) {
@@ -335,6 +382,7 @@ function handleStreamEvent(state: OpenAIReadState, event: Record<string, unknown
           handleCompletedMessageItem(state, item);
         }
       }
+      emitCompletedBackfill(blocksBeforeCompletion, buildOrderedBlocks(state), cb);
       state.stopReason = event.type === "response.completed"
         ? (state.toolCalls.length > 0 ? "tool_use" : "stop")
         : String(response?.incomplete_details?.reason ?? "incomplete");
@@ -358,31 +406,21 @@ function finalizeReadState(state: OpenAIReadState): StreamResult {
     .sort((a, b) => a[0] - b[0])
     .filter(([, item]) => hasRenderableReasoning(item));
   const orderedReasoningItems = orderedReasoningEntries.map(([, item]) => item);
-
-  const orderedBlocks: ContentBlock[] = [];
-  state.fullThinking.value = "";
   const orderedTextEntries = [...state.textStates.entries()]
     .sort((a, b) => a[0] - b[0])
     .filter(([, text]) => text.length > 0);
-  const orderedEntries = [
-    ...orderedReasoningEntries.map(([outputIndex, item]) => ({ outputIndex, kind: "reasoning" as const, item })),
-    ...orderedTextEntries.map(([outputIndex, text]) => ({ outputIndex, kind: "text" as const, text })),
-  ].sort((a, b) => a.outputIndex - b.outputIndex);
-
-  for (const entry of orderedEntries) {
-    if (entry.kind === "reasoning") {
-      finalizeReasoningItem(entry.item, orderedBlocks, state.fullThinking);
-    } else {
-      orderedBlocks.push({ type: "text", text: entry.text });
-    }
-  }
+  const orderedBlocks = buildOrderedBlocks(state);
 
   const fullText = orderedTextEntries.map(([, text]) => text).join("");
+  const fullThinking = orderedBlocks
+    .filter((block): block is Extract<ContentBlock, { type: "thinking" }> => block.type === "thinking")
+    .map((block) => block.text)
+    .join("");
   if (!state.stopReason && state.toolCalls.length > 0) state.stopReason = "tool_use";
 
   return {
     text: fullText,
-    thinking: state.fullThinking.value,
+    thinking: fullThinking,
     stopReason: state.stopReason,
     blocks: orderedBlocks,
     toolCalls: state.toolCalls,
