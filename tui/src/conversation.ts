@@ -272,6 +272,13 @@ function renderUserMessage(text: string, cols: number, images?: ImageAttachment[
   return { lines, cont };
 }
 
+function renderSystemMessage(text: string, availableWidth: number, color?: string): string[] {
+  const sysWidth = availableWidth - 2; // 2-char indent
+  const { lines: wrapped } = wordWrap(text, sysWidth > 0 ? sysWidth : 1);
+  const style = color || theme.dim;
+  return wrapped.map(sl => `  ${style}${sl}${theme.reset}`);
+}
+
 // ── Message boundary tracking ───────────────────────────────────────
 
 /** Row range for a single message in the rendered history lines. */
@@ -365,11 +372,8 @@ export function buildMessageLines(
       pushLine(`${theme.accent}${bottomLine}${theme.reset}`);
       pushMessageBound(msg.role, start, contentStart, contentEnd);
     } else {
-      const color = msg.color || theme.dim;
-      const sysWidth = availableWidth - 2; // 2-char indent
-      const { lines: wrapped } = wordWrap(msg.text, sysWidth > 0 ? sysWidth : 1);
-      for (const sl of wrapped) {
-        pushLine(`  ${color}${sl}${theme.reset}`);
+      for (const sl of renderSystemMessage(msg.text, availableWidth, msg.color)) {
+        pushLine(sl);
       }
       pushMessageBound(msg.role, start, start, lines.length);
     }
@@ -384,6 +388,17 @@ export function buildMessageLines(
     const contentEnd = lines.length;
     for (const ml of renderMetadata(state.pendingAI.metadata)) pushLine(ml);
     pushMessageBound(state.pendingAI.role, start, start, contentEnd);
+  }
+
+  // Live system-message tail during streaming. These notices are buffered in
+  // state and rendered after pendingAI so they stay visible at the bottom
+  // instead of getting buried above a growing assistant message.
+  for (const msg of state.systemMessageBuffer) {
+    const start = lines.length;
+    for (const sl of renderSystemMessage(msg.text, availableWidth, msg.color)) {
+      pushLine(sl);
+    }
+    pushMessageBound(msg.role, start, start, lines.length);
   }
 
   // Queued messages — dimmed user bubbles with timing label (after pendingAI)

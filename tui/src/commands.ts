@@ -9,7 +9,7 @@
  */
 
 import type { RenderState } from "./state";
-import { clearPendingAI } from "./state";
+import { clearPendingAI, clearSystemMessageBuffer, pushSystemMessage } from "./state";
 import { clearPrompt } from "./promptline";
 import {
   DEFAULT_EFFORT,
@@ -60,7 +60,7 @@ export interface SlashCommand {
 // ── Command definitions ─────────────────────────────────────────────
 
 function showNoSystemInstructions(state: RenderState): CommandResult {
-  state.messages.push({ role: "system", text: "No system instructions set for this conversation.", metadata: null });
+  pushSystemMessage(state, "No system instructions set for this conversation.");
   clearPrompt(state);
   return { type: "handled" };
 }
@@ -191,7 +191,7 @@ const commands: SlashCommand[] = [
       const lines = commands
         .filter(c => c.name !== "/exit")
         .map(c => `${c.name}  ${c.description}`);
-      state.messages.push({ role: "system", text: lines.join("\n"), metadata: null });
+      pushSystemMessage(state, lines.join("\n"));
       clearPrompt(state);
       return { type: "handled" };
     },
@@ -212,6 +212,7 @@ const commands: SlashCommand[] = [
     handler: (_text, state) => {
       state.messages = [];
       clearPendingAI(state);
+      clearSystemMessageBuffer(state);
       clearPrompt(state);
       state.scrollOffset = 0;
       state.contextTokens = null;
@@ -224,7 +225,7 @@ const commands: SlashCommand[] = [
     description: "Rename the current conversation",
     handler: (text, state) => {
       if (!state.convId) {
-        state.messages.push({ role: "system", text: "No active conversation to rename.", metadata: null });
+        pushSystemMessage(state, "No active conversation to rename.");
         clearPrompt(state);
         return { type: "handled" };
       }
@@ -256,22 +257,14 @@ const commands: SlashCommand[] = [
       const providers = availableProviders(state);
 
       if (parts.length === 1) {
-        state.messages.push({
-          role: "system",
-          text: `Current: ${state.provider}/${state.model}\nAvailable:\n${providers.map((provider) => formatProviderModels(state, provider)).join("\n")}\nUsage: /model <provider> <model>`,
-          metadata: null,
-        });
+        pushSystemMessage(state, `Current: ${state.provider}/${state.model}\nAvailable:\n${providers.map((provider) => formatProviderModels(state, provider)).join("\n")}\nUsage: /model <provider> <model>`);
         clearPrompt(state);
         return { type: "handled" };
       }
 
       const provider = parts[1] as ProviderId;
       if (!providers.includes(provider)) {
-        state.messages.push({
-          role: "system",
-          text: `Unknown provider: ${parts[1]}. Available: ${providers.join(", ")}`,
-          metadata: null,
-        });
+        pushSystemMessage(state, `Unknown provider: ${parts[1]}. Available: ${providers.join(", ")}`);
         clearPrompt(state);
         return { type: "handled" };
       }
@@ -279,18 +272,14 @@ const commands: SlashCommand[] = [
       if (parts.length === 2) {
         const currentModel = provider === state.provider ? state.model : defaultModelForProvider(state, provider) ?? "(unknown)";
         const efforts = effortItems(state, provider, currentModel);
-        state.messages.push({
-          role: "system",
-          text: `Current: ${currentModel}\nAvailable: ${providerModels(state, provider).join(", ") || "(waiting for daemon)"}\nEffort: ${efforts.map((item) => item.name).join(", ") || DEFAULT_EFFORT}${providerAllowsCustomModels(state, provider) ? "\nThis provider also accepts custom model ids." : ""}`,
-          metadata: null,
-        });
+        pushSystemMessage(state, `Current: ${currentModel}\nAvailable: ${providerModels(state, provider).join(", ") || "(waiting for daemon)"}\nEffort: ${efforts.map((item) => item.name).join(", ") || DEFAULT_EFFORT}${providerAllowsCustomModels(state, provider) ? "\nThis provider also accepts custom model ids." : ""}`);
         clearPrompt(state);
         return { type: "handled" };
       }
 
       const model = parts[2] as ModelId;
       if (state.convId && provider !== state.provider) {
-        state.messages.push({ role: "system", text: "Provider is locked for the active conversation. Start a new conversation to switch providers.", metadata: null });
+        pushSystemMessage(state, "Provider is locked for the active conversation. Start a new conversation to switch providers.");
         clearPrompt(state);
         return { type: "handled" };
       }
@@ -303,7 +292,7 @@ const commands: SlashCommand[] = [
       if (!providerSupportsFastMode(state, provider)) state.fastMode = false;
       const effortSuffix = state.effort !== previousEffort ? ` (effort ${state.effort})` : "";
       const fastSuffix = previousFastMode && !state.fastMode ? " (fast off)" : "";
-      state.messages.push({ role: "system", text: `Model set to ${state.provider}/${state.model}${effortSuffix}${fastSuffix}`, metadata: null });
+      pushSystemMessage(state, `Model set to ${state.provider}/${state.model}${effortSuffix}${fastSuffix}`);
       clearPrompt(state);
       return state.convId ? { type: "model_changed", model } : { type: "handled" };
     },
@@ -320,18 +309,14 @@ const commands: SlashCommand[] = [
       if (arg && supportedLevels.includes(arg as EffortLevel)) {
         const effort = arg as EffortLevel;
         state.effort = effort;
-        state.messages.push({ role: "system", text: `Effort set to ${effort}`, metadata: null });
+        pushSystemMessage(state, `Effort set to ${effort}`);
         clearPrompt(state);
         return { type: "effort_changed", effort };
       } else {
         const detail = supported
           .map((candidate) => `${candidate.effort}: ${candidate.description}`)
           .join("\n");
-        state.messages.push({
-          role: "system",
-          text: `Current: ${state.effort}. Available: ${formatEffortChoices(supported, state.effort, defaultEffort)}${detail ? `\n${detail}` : ""}`,
-          metadata: null,
-        });
+        pushSystemMessage(state, `Current: ${state.effort}. Available: ${formatEffortChoices(supported, state.effort, defaultEffort)}${detail ? `\n${detail}` : ""}`);
       }
       clearPrompt(state);
       return { type: "handled" };
@@ -355,32 +340,32 @@ const commands: SlashCommand[] = [
         const availability = supportsFast
           ? `Fast mode is ${state.fastMode ? "on" : "off"}.`
           : `Fast mode is unavailable for provider ${providerLabel}.`;
-        state.messages.push({ role: "system", text: availability, metadata: null });
+        pushSystemMessage(state, availability);
         clearPrompt(state);
         return { type: "handled" };
       }
 
       if (!["on", "off", "toggle"].includes(arg)) {
-        state.messages.push({ role: "system", text: "Usage: /fast [on|off|toggle]", metadata: null });
+        pushSystemMessage(state, "Usage: /fast [on|off|toggle]");
         clearPrompt(state);
         return { type: "handled" };
       }
 
       if (!supportsFast) {
-        state.messages.push({ role: "system", text: `Fast mode is only available for ${providerLabel} conversations that support it.`, metadata: null });
+        pushSystemMessage(state, `Fast mode is only available for ${providerLabel} conversations that support it.`);
         clearPrompt(state);
         return { type: "handled" };
       }
 
       const enabled = arg === "toggle" ? !state.fastMode : arg === "on";
       if (enabled === state.fastMode) {
-        state.messages.push({ role: "system", text: `Fast mode already ${enabled ? "on" : "off"}.`, metadata: null });
+        pushSystemMessage(state, `Fast mode already ${enabled ? "on" : "off"}.`);
         clearPrompt(state);
         return { type: "handled" };
       }
 
       state.fastMode = enabled;
-      state.messages.push({ role: "system", text: `Fast mode ${enabled ? "enabled" : "disabled"}.`, metadata: null });
+      pushSystemMessage(state, `Fast mode ${enabled ? "enabled" : "disabled"}.`);
       clearPrompt(state);
       return state.convId ? { type: "fast_mode_changed", enabled } : { type: "handled" };
     },
@@ -390,20 +375,20 @@ const commands: SlashCommand[] = [
     description: "Copy conversation info to clipboard",
     handler: (_text, state) => {
       if (!state.convId) {
-        state.messages.push({ role: "system", text: "No active conversation.", metadata: null });
+        pushSystemMessage(state, "No active conversation.");
         clearPrompt(state);
         return { type: "handled" };
       }
 
       const info = formatConvoInfo(state);
       if (!info) {
-        state.messages.push({ role: "system", text: "No active conversation.", metadata: null });
+        pushSystemMessage(state, "No active conversation.");
         clearPrompt(state);
         return { type: "handled" };
       }
 
       copyToClipboard(info);
-      state.messages.push({ role: "system", text: "Conversation info copied to clipboard.", metadata: null });
+      pushSystemMessage(state, "Conversation info copied to clipboard.");
       clearPrompt(state);
       return { type: "handled" };
     },
@@ -417,16 +402,16 @@ const commands: SlashCommand[] = [
       const arg = parts[1];
       if (arg && arg in themes) {
         if (arg === theme.name) {
-          state.messages.push({ role: "system", text: `Theme is already ${arg}`, metadata: null });
+          pushSystemMessage(state, `Theme is already ${arg}`);
           clearPrompt(state);
           return { type: "handled" };
         }
         setTheme(arg);
-        state.messages.push({ role: "system", text: `Theme set to ${arg}`, metadata: null });
+        pushSystemMessage(state, `Theme set to ${arg}`);
         clearPrompt(state);
         return { type: "theme_changed" };
       } else {
-        state.messages.push({ role: "system", text: `Current: ${theme.name}. Available: ${THEME_NAMES.join(", ")}`, metadata: null });
+        pushSystemMessage(state, `Current: ${theme.name}. Available: ${THEME_NAMES.join(", ")}`);
       }
       clearPrompt(state);
       return { type: "handled" };
@@ -446,7 +431,7 @@ const commands: SlashCommand[] = [
         // Show current instructions
         const instrMsg = state.messages.find((m): m is import("./messages").SystemInstructionsMessage => m.role === "system_instructions");
         if (instrMsg?.text.trim()) {
-          state.messages.push({ role: "system", text: `Current instructions:\n${instrMsg.text}`, metadata: null });
+          pushSystemMessage(state, `Current instructions:\n${instrMsg.text}`);
           clearPrompt(state);
           return { type: "handled" };
         }

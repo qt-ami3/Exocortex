@@ -104,7 +104,13 @@ export interface RenderState {
   pendingSystemInstructions: string | null;
   /** Whether a just-created conversation should auto-generate its title. */
   pendingGenerateTitleOnCreate: boolean;
-  /** System messages buffered during streaming — flushed after AI message completes. */
+  /**
+   * System messages buffered while streaming.
+   *
+   * They render as a live tail after the active AI message so notices stay
+   * visible at the bottom, then flush into committed history when streaming
+   * stops (or get replaced by canonical history via history_updated).
+   */
   systemMessageBuffer: SystemMessage[];
   /** Available tools reported by the daemon on connect. */
   toolRegistry: ToolDisplayInfo[];
@@ -150,6 +156,27 @@ export function isStreaming(state: RenderState): boolean {
 /** Clear pending AI state — always use this instead of setting pendingAI = null directly. */
 export function clearPendingAI(state: RenderState): void {
   state.pendingAI = null;
+}
+
+/** Clear the live system-message tail used while streaming. */
+export function clearSystemMessageBuffer(state: RenderState): void {
+  state.systemMessageBuffer = [];
+}
+
+/**
+ * Add a system notice to the UI.
+ *
+ * While an assistant response is actively streaming, system notices are kept in
+ * the live tail so they stay visible at the bottom. Otherwise they are
+ * committed directly into the conversation message list.
+ */
+export function pushSystemMessage(state: RenderState, text: string, color?: string): void {
+  const msg: SystemMessage = { role: "system", text, color, metadata: null };
+  if (isStreaming(state)) {
+    state.systemMessageBuffer.push(msg);
+  } else {
+    state.messages.push(msg);
+  }
 }
 
 // ── Focus transition helpers ──────────────────────────────────────
