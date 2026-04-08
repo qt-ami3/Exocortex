@@ -6,9 +6,9 @@
  */
 
 import type { RenderState } from "./state";
-import { isStreaming, clearPendingAI } from "./state";
+import { clearPendingAI, clearSystemMessageBuffer, pushSystemMessage } from "./state";
 import { DEFAULT_PROVIDER_ID, DEFAULT_MODEL_BY_PROVIDER, ensureCurrentBlock, createPendingAI, normalizeEffortForModel, truncateToCompletedRounds, splitPendingAI } from "./messages";
-import type { AIMessage, SystemMessage, ImageAttachment } from "./messages";
+import type { AIMessage, ImageAttachment } from "./messages";
 import { savePreferredProvider } from "./preferences";
 import { updateConversationList, updateConversation, syncSelectedIndex } from "./sidebar";
 import { theme } from "./theme";
@@ -236,19 +236,14 @@ export function handleEvent(
       for (const msg of state.systemMessageBuffer) {
         state.messages.push(msg);
       }
-      state.systemMessageBuffer = [];
+      clearSystemMessageBuffer(state);
       break;
     }
 
     case "error": {
       // Only show errors for the current conversation (or unscoped errors)
       if (event.convId && event.convId !== state.convId) break;
-      const sysMsg: SystemMessage = { role: "system", text: `✗ ${event.message}`, color: theme.error, metadata: null };
-      if (isStreaming(state)) {
-        state.systemMessageBuffer.push(sysMsg);
-      } else {
-        state.messages.push(sysMsg);
-      }
+      pushSystemMessage(state, `✗ ${event.message}`, theme.error);
       break;
     }
 
@@ -322,6 +317,7 @@ export function handleEvent(
       }
       state.messages = [];
       clearPendingAI(state);
+      clearSystemMessageBuffer(state);
       state.convId = event.convId;
       selectProvider(state, event.provider ?? fallbackProvider(state));
       state.model = event.model ?? state.model;
@@ -347,20 +343,15 @@ export function handleEvent(
     }
 
     case "stream_retry": {
-      // Transient stream error mid-stream. Split pendingAI so the retry
-      // message appears inline at the correct position — same pattern as
-      // user_message interleaving. history_updated rebuilds after completion.
+      // Transient stream error mid-stream. Split pendingAI so completed rounds
+      // stay committed, but keep the retry notice in the live system-message
+      // tail so it remains visible at the bottom while the new attempt streams.
       if (state.pendingAI) {
         truncateToCompletedRounds(state.pendingAI);
         const finalized = splitPendingAI(state.pendingAI);
         if (finalized) state.messages.push(finalized);
       }
-      state.messages.push({
-        role: "system",
-        text: `⟳ ${event.errorMessage} — retrying in ${event.delaySec}s (${event.attempt}/${event.maxAttempts})…`,
-        color: theme.warning,
-        metadata: null,
-      });
+      pushSystemMessage(state, `⟳ ${event.errorMessage} — retrying in ${event.delaySec}s (${event.attempt}/${event.maxAttempts})…`, theme.warning);
       break;
     }
 
@@ -384,12 +375,7 @@ export function handleEvent(
     }
 
     case "system_message": {
-      const sysMsg: SystemMessage = { role: "system", text: event.text, color: themeColor(event.color), metadata: null };
-      if (isStreaming(state)) {
-        state.systemMessageBuffer.push(sysMsg);
-      } else {
-        state.messages.push(sysMsg);
-      }
+      pushSystemMessage(state, event.text, themeColor(event.color));
       break;
     }
 
@@ -429,14 +415,14 @@ export function handleEvent(
       // but preserve pendingAI (the active streaming response).
       // Flush buffered system messages — they reference pre-modification state.
       state.messages = [];
-      state.systemMessageBuffer = [];
+      clearSystemMessageBuffer(state);
       state.contextTokens = event.contextTokens;
       pushDisplayEntries(state, event.entries);
       break;
     }
 
     case "auth_status": {
-      state.messages.push({ role: "system", text: event.message, color: theme.muted, metadata: null });
+      pushSystemMessage(state, event.message, theme.muted);
       if (event.openUrl) {
         Bun.spawn(["xdg-open", event.openUrl], { stdout: "ignore", stderr: "ignore" }).unref();
       }
@@ -444,7 +430,7 @@ export function handleEvent(
     }
 
     case "system_prompt": {
-      state.messages.push({ role: "system", text: event.systemPrompt, metadata: null });
+      pushSystemMessage(state, event.systemPrompt);
       break;
     }
 

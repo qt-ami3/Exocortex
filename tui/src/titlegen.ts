@@ -9,6 +9,7 @@
 
 import type { DaemonClient } from "./client";
 import type { RenderState } from "./state";
+import { pushSystemMessage } from "./state";
 import { getMarkPrefix } from "./marks";
 
 // ── Prompt ─────────────────────────────────────────────────────────
@@ -108,7 +109,7 @@ export function generateTitle(
       // Revert from pending to the last stable title (or empty for a brand-new
       // conversation) so the UI doesn't get stuck showing a perpetual pending state.
       setCanonicalTitle(convId, previousStableTitle, state, daemon, scheduleRender);
-      state.messages.push({ role: "system", text: `✗ Title generation failed: ${error}`, metadata: null });
+      pushSystemMessage(state, `✗ Title generation failed: ${error}`);
     },
     state.provider,
     titleModelForProvider(state.provider),

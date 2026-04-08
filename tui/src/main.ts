@@ -17,7 +17,7 @@ import { tryCommand } from "./commands";
 import { expandMacros } from "./macros";
 import { render } from "./render";
 import { enter_alt, leave_alt, hide_cursor, show_cursor, enable_bracketed_paste, disable_bracketed_paste, enable_kitty_kbd, disable_kitty_kbd, enable_mouse, disable_mouse, set_cursor_color, reset_cursor_color } from "./terminal";
-import { createInitialState, isStreaming, clearPendingAI } from "./state";
+import { createInitialState, isStreaming, clearPendingAI, clearSystemMessageBuffer, pushSystemMessage } from "./state";
 import { createPendingAI, type ImageAttachment, type ProviderId } from "./messages";
 import { handleEvent } from "./events";
 import { confirmQueueMessage, cancelQueuePrompt, clearLocalQueue, removeLocalQueueEntry } from "./queue";
@@ -291,6 +291,7 @@ function handleKey(key: KeyEvent): void {
       state.convId = null;
       state.messages = [];
       clearPendingAI(state);
+      clearSystemMessageBuffer(state);
       state.contextTokens = null;
       state.pendingSystemInstructions = null;
       state.pendingGenerateTitleOnCreate = false;
@@ -396,7 +397,7 @@ async function main(): Promise<void> {
 
   daemon.onConnectionLost(() => {
     clearPendingAI(state);
-    state.messages.push({ role: "system", text: "✗ Lost connection to daemon.", color: theme.error, metadata: null });
+    pushSystemMessage(state, "✗ Lost connection to daemon.", theme.error);
     scheduleRender();
     setTimeout(() => { running = false; }, 2000);
   });
