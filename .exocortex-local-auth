@@ -1,3 +1,0 @@
-This worktree opts into local auth isolation.
-
-The daemon stores auth in config/secrets.local/ instead of config/secrets/, and OpenAI Codex auth auto-import is disabled so the login flow starts signed out.

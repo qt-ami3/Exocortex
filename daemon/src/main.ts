@@ -25,7 +25,7 @@ import { startWatchdog, stopWatchdog } from "./watchdog";
 import { initExternalTools, stopExternalToolsAsync, getExternalToolCount, getSupervisedDaemonCount, getExternalToolStyles } from "./external-tools";
 import { getToolDisplayInfo } from "./tools/registry";
 import { getProviders, refreshProviders } from "./providers/registry";
-import { socketPath, pidPath, runtimeDir, worktreeName, isWindows, isWorktreeAuthIsolated } from "@exocortex/shared/paths";
+import { socketPath, pidPath, runtimeDir, worktreeName, isWindows } from "@exocortex/shared/paths";
 
 // ── Paths ───────────────────────────────────────────────────────────
 
@@ -152,13 +152,12 @@ async function startDaemon(): Promise<void> {
     .join(" ");
 
   const wt = worktreeName();
-  const isolatedAuth = isWorktreeAuthIsolated();
   const cronJobs = isWindows ? [] : getJobs();
   const extToolCount = isWindows ? 0 : getExternalToolCount();
   const supervisedCount = isWindows ? 0 : getSupervisedDaemonCount();
   console.log(`\n  exocortexd running (pid ${process.pid})${wt ? ` [worktree: ${wt}]` : ""}`);
   console.log(`  socket: ${SOCKET_PATH}`);
-  console.log(`  auth:   ${authSummary || "none configured"}${isolatedAuth ? " (isolated worktree auth)" : ""}`);
+  console.log(`  auth:   ${authSummary || "none configured"}`);
   console.log(`  cron:   ${cronJobs.length} job(s) in ${getCronDir()}`);
   console.log(`  tools:  ${extToolCount} external tool(s)${supervisedCount > 0 ? `, ${supervisedCount} supervised daemon(s)` : ""}`);
   console.log(`\n  Waiting for connections...\n`);
